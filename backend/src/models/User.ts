@@ -35,7 +35,7 @@ const UserSchema: Schema = new Schema(
     },
     seatingPreference: {
       type: String,
-      enum: ['indoor', 'outdoor', 'window', 'any'],
+      enum: ['Indoor / AC', 'Outdoor Garden', 'Window View', 'Any'],
     },
   },
   {
