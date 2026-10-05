@@ -91,7 +91,7 @@ export default function RegisterPage() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.userTypeButton, userType === 'staff' && styles.activeUserType]}
-              onPress={() => setUserType('staff')}
+              onPress={() => router.push('/staff/login')}
             >
               <Text style={[styles.userTypeText, userType === 'staff' && styles.activeUserTypeText]}>
                 Restaurant Staff
