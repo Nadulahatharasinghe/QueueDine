@@ -58,7 +58,11 @@ const UserSchema = new mongoose_1.Schema({
     },
     seatingPreference: {
         type: String,
-        enum: ['indoor', 'outdoor', 'window', 'any'],
+        enum: ['Indoor / AC', 'Outdoor Garden', 'Window View', 'Any'],
+    },
+    profilePicture: {
+        type: String,
+        default: null,
     },
 }, {
     timestamps: true,

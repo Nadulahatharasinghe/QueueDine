@@ -158,7 +158,7 @@ export default function HomePage() {
           <Text style={styles.navIcon}>🔔</Text>
           <Text style={styles.navLabel}>Notifications</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
           <Text style={styles.navIcon}>👤</Text>
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
