@@ -58,7 +58,7 @@ export function PartyScreen() {
 export function ReservationFormScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [name, setName] = useState(''), [phone, setPhone] = useState(''), [size, setSize] = useState(4), [notes, setNotes] = useState('');
-  const [date, setDate] = useState(''), [hour, setHour] = useState('19:00');
+  const [date, setDate] = useState(''), [hour, setHour] = useState('');
   const [initialized, setInitialized] = useState(false);
   const source = useStaffResource<Party>(id ? `parties/${id}` : 'me', false, p => {
       if (!id || initialized) return;
@@ -80,10 +80,10 @@ export function ReservationFormScreen() {
   }); };
   return <StaffShell title={id ? 'Modify Reservation' : 'New Reservation'} footer={<Button title={id ? 'Save Changes' : 'Create Reservation'} busy={mutation.busy} disabled={!!id && !initialized} onPress={save} />}>
     {id && <Feedback loading={source.loading} error={source.error} retry={() => { void source.reload(); }} />}
-    <Field label="CUSTOMER NAME" value={name} onChangeText={setName} placeholder="Customer name" /><PartySize value={size} onChange={setSize} />
-    <Field label="MOBILE NUMBER" value={phone} onChangeText={setPhone} placeholder="+94 77 123 4567" phone />
-    <Field label="DATE (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder="2026-10-10" />
-    <Field label="TIME (24-HOUR HH:MM)" value={hour} onChangeText={setHour} placeholder="19:00" />
+    <Field label="CUSTOMER NAME" value={name} onChangeText={setName} placeholder="Enter customer name" /><PartySize value={size} onChange={setSize} />
+    <Field label="MOBILE NUMBER" value={phone} onChangeText={setPhone} placeholder="e.g. +94 77 123 4567" phone />
+    <Field label="DATE (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
+    <Field label="TIME (24-HOUR HH:MM)" value={hour} onChangeText={setHour} placeholder="e.g. 19:00" />
     <Text style={ui.muted}>Booking times use Sri Lanka time (Asia/Colombo).</Text>
     <Field label="SPECIAL REQUESTS (OPTIONAL)" value={notes} onChangeText={setNotes} multiline placeholder="e.g. window seat" /><Feedback error={mutation.error} />
   </StaffShell>;

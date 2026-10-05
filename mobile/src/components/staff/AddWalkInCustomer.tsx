@@ -75,7 +75,7 @@ export default function AddWalkInCustomer() {
             <FieldIcon kind="person" />
             <View style={styles.field}>
               <Text style={styles.label}>CUSTOMER NAME</Text>
-              <TextInput style={styles.input} accessibilityLabel="Customer name" value={name} onChangeText={setName} placeholder="Kavindu Perera" placeholderTextColor="#151D2E" autoCapitalize="words" autoComplete="name" />
+              <TextInput style={styles.input} accessibilityLabel="Customer name" value={name} onChangeText={setName} placeholder="Enter customer name" placeholderTextColor="#98A2B3" autoCapitalize="words" autoComplete="name" />
             </View>
           </View>
           <View style={styles.card}>
@@ -97,7 +97,7 @@ export default function AddWalkInCustomer() {
             <FieldIcon kind="phone" />
             <View style={styles.field}>
               <Text style={styles.label}>MOBILE NUMBER</Text>
-              <TextInput style={styles.input} accessibilityLabel="Mobile number" value={mobile} onChangeText={setMobile} placeholder="+94 77 123 4567" placeholderTextColor="#151D2E" keyboardType="phone-pad" autoComplete="tel" />
+              <TextInput style={styles.input} accessibilityLabel="Mobile number" value={mobile} onChangeText={setMobile} placeholder="e.g. +94 77 123 4567" placeholderTextColor="#98A2B3" keyboardType="phone-pad" autoComplete="tel" />
             </View>
           </View>
           <View style={[styles.card, styles.requestsCard]}>
