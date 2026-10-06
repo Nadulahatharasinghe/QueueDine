@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import User from '../models/User';
+import Reservation from '../models/Reservation';
+import QueueEntry from '../models/QueueEntry';
+import Favorite from '../models/Favorite';
 import { AuthRequest } from '../middleware/authMiddleware';
 
 export const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -149,6 +152,33 @@ export const deleteProfilePicture = async (req: AuthRequest, res: Response): Pro
       res.status(500).json({ error: error.message });
     } else {
       res.status(500).json({ error: 'An error occurred while deleting profile picture' });
+    }
+  }
+};
+
+export const getUserStats = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const bookingsCount = await Reservation.countDocuments({ userId });
+    const activeQueuesCount = await QueueEntry.countDocuments({ userId, status: 'waiting' });
+    const favoritesCount = await Favorite.countDocuments({ userId });
+
+    res.status(200).json({
+      bookings: bookingsCount,
+      queues: activeQueuesCount,
+      favorites: favoritesCount,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(500).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'An error occurred while fetching user stats' });
     }
   }
 };

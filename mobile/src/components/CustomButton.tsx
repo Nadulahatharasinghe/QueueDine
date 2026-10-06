@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
+  StyleProp,
 } from 'react-native';
 import { COLORS, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from '../constants/theme';
 
@@ -15,8 +16,8 @@ interface CustomButtonProps {
   variant?: 'primary' | 'secondary' | 'outline';
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 }
 
 const CustomButton: React.FC<CustomButtonProps> = ({

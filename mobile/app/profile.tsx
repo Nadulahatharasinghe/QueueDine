@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Modal,
   Switch,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING, BORDER_RADIUS, SHADOWS } from '../src/constants/theme';
@@ -30,10 +30,22 @@ export default function ProfilePage() {
     seatingPreference: '',
   });
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [stats, setStats] = useState({
+    bookings: 0,
+    queues: 0,
+    favorites: 0,
+  });
 
   useEffect(() => {
     loadUserData();
+    loadUserStats();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUserStats();
+    }, [])
+  );
 
   const loadUserData = async () => {
     try {
@@ -59,6 +71,27 @@ export default function ProfilePage() {
           seatingPreference: parsedUser.seatingPreference || '',
         });
       }
+    }
+  };
+
+  const loadUserStats = async () => {
+    try {
+      const response = await apiClient.get('/api/users/stats');
+      if (response.data) {
+        setStats({
+          bookings: response.data.bookings || 0,
+          queues: response.data.queues || 0,
+          favorites: response.data.favorites || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+      // Set default values if stats endpoint fails
+      setStats({
+        bookings: 0,
+        queues: 0,
+        favorites: 0,
+      });
     }
   };
 
@@ -216,18 +249,18 @@ export default function ProfilePage() {
 
           {/* Stats Section */}
           <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>0</Text>
+            <TouchableOpacity style={styles.statItem} onPress={() => router.push('/reservations')}>
+              <Text style={styles.statValue}>{stats.bookings}</Text>
               <Text style={styles.statLabel}>Bookings</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statValue}>{stats.queues}</Text>
               <Text style={styles.statLabel}>Queues</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statValue}>{stats.favorites}</Text>
               <Text style={styles.statLabel}>Favorites</Text>
             </View>
           </View>
@@ -254,14 +287,6 @@ export default function ProfilePage() {
               </View>
               <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <Text style={styles.menuIcon}>💳</Text>
-                <Text style={styles.menuItemText}>Payment Methods</Text>
-              </View>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Activity & Records Section */}
@@ -276,7 +301,7 @@ export default function ProfilePage() {
               <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reservations')}>
               <View style={styles.menuItemLeft}>
                 <Text style={styles.menuIcon}>📜</Text>
                 <Text style={styles.menuItemText}>Reservation History</Text>
@@ -302,7 +327,7 @@ export default function ProfilePage() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>SUPPORT & ABOUT</Text>
 
-            <TouchableOpacity style={styles.menuItem}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/faq')}>
               <View style={styles.menuItemLeft}>
                 <Text style={styles.menuIcon}>❓</Text>
                 <Text style={styles.menuItemText}>Help & Support</Text>
@@ -310,7 +335,7 @@ export default function ProfilePage() {
               <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/about')}>
               <View style={styles.menuItemLeft}>
                 <Text style={styles.menuIcon}>ℹ️</Text>
                 <Text style={styles.menuItemText}>About QueueDine</Text>

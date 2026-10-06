@@ -5,6 +5,13 @@ import { connectDatabase } from './config/database';
 import authRoutes from './routes/authRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import userRoutes from './routes/userRoutes';
+import restaurantRoutes from './routes/restaurantRoutes';
+import reservationRoutes from './routes/reservationRoutes';
+import queueRoutes from './routes/queueRoutes';
+import notificationRoutes from './routes/notificationRoutes';
+import favoriteRoutes from './routes/favoriteRoutes';
+import { authMiddleware } from './middleware/authMiddleware';
+import { seedRestaurantData } from './utils/seed';
 
 dotenv.config();
 
@@ -17,6 +24,13 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/reservations', authMiddleware, reservationRoutes);
+app.use('/api/queue', authMiddleware, queueRoutes);
+app.use('/api/notifications', authMiddleware, notificationRoutes);
+app.use('/api/favorites', authMiddleware, favoriteRoutes);
+
+console.log('User routes mounted at /api/users');
 
 app.get('/', (req, res) => {
   res.json({ message: 'QueueDine API Server' });
@@ -25,6 +39,7 @@ app.get('/', (req, res) => {
 const startServer = async (): Promise<void> => {
   try {
     await connectDatabase();
+    await seedRestaurantData();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
