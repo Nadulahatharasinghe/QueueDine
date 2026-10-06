@@ -152,7 +152,7 @@ export function AlertScreen() {
     <Feedback {...resource} retry={() => { void resource.reload(); }} /><View style={styles.alertHero}><View style={styles.alertCircle}><Text style={{ color: burgundy, fontSize: 34 }}>{sent ? '✓' : '➤'}</Text></View><Text style={styles.largeTitle}>{sent ? 'Alert Recorded' : 'Notify Customer'}</Text><Text style={[ui.muted, { textAlign: 'center' }]}>{p?.customerName} ({p?.number})</Text></View>
     {!sent && <Filters items={['Table Ready', 'Almost Ready']} selected={stage} onSelect={value => { setStage(value); key.current = requestKey(); }} />}
     <Card><Text style={ui.muted}>Hi {p?.customerName || 'there'}, {stage === 'Table Ready' ? 'your table is ready. Please return to the host stand.' : 'your table will be ready shortly. Please stay nearby.'}</Text></Card>
-    <Text style={ui.muted}>This records an in-app alert. SMS delivery and the customer notification inbox are not connected to this staff portal yet.</Text><Feedback error={mutation.error} />
+    <Feedback error={mutation.error} />
   </StaffShell>;
 }
 export function NoShowScreen() {
