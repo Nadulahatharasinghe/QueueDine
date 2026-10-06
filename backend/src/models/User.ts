@@ -6,6 +6,7 @@ export interface IUser extends Document {
   password: string;
   phone?: string;
   seatingPreference?: string;
+  profilePicture?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +37,10 @@ const UserSchema: Schema = new Schema(
     seatingPreference: {
       type: String,
       enum: ['Indoor / AC', 'Outdoor Garden', 'Window View', 'Any'],
+    },
+    profilePicture: {
+      type: String,
+      default: null,
     },
   },
   {

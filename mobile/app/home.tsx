@@ -1,20 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING, BORDER_RADIUS, SHADOWS } from '../src/constants/theme';
 import Logo from '../src/components/Logo';
 import CustomButton from '../src/components/CustomButton';
 import ScreenContainer from '../src/components/ScreenContainer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUnreadCount } from '../src/services/notificationService';
 
 export default function HomePage() {
   const [user, setUser] = useState<any>(null);
   const [greeting, setGreeting] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     loadUserData();
     setGreetingBasedOnTime();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          const r = await getUnreadCount();
+          if (active) setUnreadCount(r.unreadCount || 0);
+        } catch (_) {
+          if (active) setUnreadCount(0);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   const loadUserData = async () => {
     try {
@@ -96,13 +115,13 @@ export default function HomePage() {
             <View style={styles.actionButtons}>
               <CustomButton
                 title="Reserve a Table"
-                onPress={() => {}}
+                onPress={() => router.push('/restaurant')}
                 variant="primary"
                 style={styles.actionButton}
               />
               <CustomButton
                 title="Join Virtual Queue"
-                onPress={() => {}}
+                onPress={() => router.push('/restaurant')}
                 variant="outline"
                 style={styles.actionButton}
               />
@@ -150,15 +169,22 @@ export default function HomePage() {
           <Text style={[styles.navIcon, styles.activeNavIcon]}>🏠</Text>
           <Text style={[styles.navLabel, styles.activeNavLabel]}>Home</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/reservations')}>
           <Text style={styles.navIcon}>📅</Text>
           <Text style={styles.navLabel}>Bookings</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>🔔</Text>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/notifications')}>
+          <View>
+            <Text style={styles.navIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : String(unreadCount)}</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.navLabel}>Notifications</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
           <Text style={styles.navIcon}>👤</Text>
           <Text style={styles.navLabel}>Profile</Text>
         </TouchableOpacity>
@@ -339,5 +365,22 @@ const styles = StyleSheet.create({
   activeNavLabel: {
     color: COLORS.primary,
     fontWeight: FONT_WEIGHTS.semibold,
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    fontSize: 10,
+    color: COLORS.white,
+    fontWeight: FONT_WEIGHTS.bold,
   },
 });

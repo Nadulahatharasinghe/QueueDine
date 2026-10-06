@@ -1,14 +1,21 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING, BORDER_RADIUS } from '../src/constants/theme';
 import Logo from '../src/components/Logo';
 import CustomButton from '../src/components/CustomButton';
-import ScreenContainer from '../src/components/ScreenContainer';
 
 export default function LandingPage() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScreenContainer scrollable={false}>
+    <LinearGradient
+      colors={['#2D1B15', '#1A0F0C', '#0D0705', '#000000']}
+      locations={[0, 0.4, 0.7, 1]}
+      style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+    >
       <View style={styles.content}>
         <View style={styles.logoContainer}>
           <Logo size="large" />
@@ -43,15 +50,19 @@ export default function LandingPage() {
           <Text style={styles.signInText}>Already have an account? Sign In</Text>
         </TouchableOpacity>
       </View>
-    </ScreenContainer>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
   },
   logoContainer: {
     marginBottom: SPACING.xxl,
@@ -59,18 +70,17 @@ const styles = StyleSheet.create({
   textContainer: {
     alignItems: 'center',
     marginBottom: SPACING.xxl,
-    paddingHorizontal: SPACING.lg,
   },
   title: {
     fontSize: FONT_SIZES.xxxl,
     fontWeight: FONT_WEIGHTS.bold,
-    color: COLORS.textPrimary,
+    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
   description: {
     fontSize: FONT_SIZES.md,
-    color: COLORS.textSecondary,
+    color: '#E8E8E8',
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -86,18 +96,20 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: COLORS.border,
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 4,
+    opacity: 0.4,
   },
   activeDot: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#D4A574',
+    opacity: 1,
   },
   signInContainer: {
     padding: SPACING.md,
   },
   signInText: {
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+    color: '#E8E8E8',
     fontWeight: FONT_WEIGHTS.medium,
   },
 });
