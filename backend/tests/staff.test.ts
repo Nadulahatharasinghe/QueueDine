@@ -14,6 +14,7 @@ import { StaffAccount, StaffRestaurant, StaffTable, StaffParty, StaffSession, St
 import { seedStaffAccount } from '../src/staff/seedAccount';
 import authRoutes from '../src/routes/authRoutes';
 import User from '../src/models/User';
+import Restaurant from '../src/models/Restaurant';
 
 test('staff portal integration in an isolated replica set', { timeout: 1200000 }, async t => {
   // Never load .env: these tests cannot connect to the shared Atlas database.
@@ -27,10 +28,21 @@ test('staff portal integration in an isolated replica set', { timeout: 1200000 }
   const server = app.listen(0, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));
   const address = server.address() as { port: number }, base = `http://127.0.0.1:${address.port}`;
-  const models = [StaffRestaurant, StaffAccount, StaffTable, StaffParty, StaffSession, StaffEvent, StaffNotification, StaffAlert, User];
+  const models = [Restaurant, StaffRestaurant, StaffAccount, StaffTable, StaffParty, StaffSession, StaffEvent, StaffNotification, StaffAlert, User];
   for (const model of models) await model.init();
   const hash = await bcrypt.hash('TestStaffPass123!', 4);
-  await StaffRestaurant.create([{ _id: 'a', name: 'Ember & Oak', location: 'Colombo' }, { _id: 'b', name: 'Other Restaurant' }]);
+  const customerRestaurant = await Restaurant.create({
+    name: 'Ember & Oak',
+    location: 'Colombo',
+    rating: 4.5,
+    reviewCount: 12,
+    description: 'A test restaurant',
+    openingHours: { open: '11:00', close: '23:00' },
+  });
+  await StaffRestaurant.create([
+    { _id: 'a', name: 'Ember & Oak', location: 'Colombo', customerRestaurantId: customerRestaurant._id },
+    { _id: 'b', name: 'Other Restaurant' },
+  ]);
   const a = await StaffAccount.create({ restaurantId: 'a', staffId: 'host-001', email: 'host@test.invalid', fullName: 'Tharindu Silva', passwordHash: hash });
   await StaffAccount.create({ restaurantId: 'b', staffId: 'host-002', email: 'other@test.invalid', fullName: 'Other Host', passwordHash: hash });
   const table1 = await StaffTable.create({ restaurantId: 'a', number: 'T01', capacity: 4 });
@@ -123,6 +135,35 @@ test('staff portal integration in an isolated replica set', { timeout: 1200000 }
           },
         );
       }
+    });
+    await t.test('restaurant profile reads and updates the canonical customer restaurant', async () => {
+      const original = await Restaurant.findById(customerRestaurant._id);
+      assert.ok(original);
+      const profile = await call('staff/restaurant');
+      assert.equal(profile.status, 200);
+      assert.equal(profile.data._id, String(customerRestaurant._id));
+      assert.equal(profile.data.name, original.name);
+
+      const updated = await call('staff/restaurant', 'PUT', {
+        name: `${original.name} Test`,
+        location: 'Colombo 02',
+        description: 'Updated test description',
+        cuisine: 'Sri Lankan',
+        openingHours: { open: '10:30', close: '22:30' },
+      });
+      assert.equal(updated.status, 200);
+      const persisted = await Restaurant.findById(customerRestaurant._id);
+      assert.equal(persisted?.name, 'Ember & Oak Test');
+      assert.equal(persisted?.location, 'Colombo 02');
+      assert.equal((await StaffRestaurant.findById('a'))?.name, 'Ember & Oak Test');
+      await Restaurant.updateOne({ _id: customerRestaurant._id }, { $set: {
+        name: original.name,
+        location: original.location,
+        description: original.description,
+        cuisine: original.cuisine,
+        openingHours: original.openingHours,
+      } });
+      await StaffRestaurant.updateOne({ _id: 'a' }, { $set: { name: 'Ember & Oak', location: 'Colombo' } });
     });
     await t.test('validates forms and saves retries only once', async () => {
       assert.equal((await call('staff/parties', 'POST', { ...details, partySize: 0 })).status, 400);

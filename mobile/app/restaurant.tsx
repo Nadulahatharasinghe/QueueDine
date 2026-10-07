@@ -156,21 +156,27 @@ export default function RestaurantScreen() {
               <Text style={styles.statIcon}>{'\u{23F1}'}</Text>
               <Text style={styles.statLabel}>Current Wait Time</Text>
               <Text style={styles.statWaitGreen}>
-                ~ {restaurant.currentWaitTime || 25} minutes
+                {restaurant.currentWaitTime != null
+                  ? `~ ${restaurant.currentWaitTime} minutes`
+                  : '\u2014'}
               </Text>
             </View>
             <View style={styles.statRow}>
               <Text style={styles.statIcon}>{'\u{1F465}'}</Text>
               <Text style={styles.statLabel}>Queue Length</Text>
               <Text style={styles.statValueRight}>
-                {restaurant.queueLength ?? 12} parties ahead
+                {restaurant.queueLength != null
+                  ? `${restaurant.queueLength} parties ahead`
+                  : '\u2014'}
               </Text>
             </View>
             <View style={styles.statRow}>
               <Text style={styles.statIcon}>{'\u{1FA91}'}</Text>
               <Text style={styles.statLabel}>Available Tables</Text>
               <Text style={styles.statValueRight}>
-                {restaurant.availableTables ?? 8} tables
+                {restaurant.availableTables != null
+                  ? `${restaurant.availableTables} tables`
+                  : '\u2014'}
               </Text>
             </View>
           </View>

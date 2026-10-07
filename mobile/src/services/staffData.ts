@@ -16,6 +16,19 @@ export interface StaffEvent {
   partyId?: string; tableId?: string; read?: boolean;
 }
 export interface Restaurant { _id: string; name: string; location: string; timeZone: string; photoUrl?: string | null }
+export interface EditableStaffRestaurant {
+  _id: string;
+  name: string;
+  description: string;
+  location: string;
+  cuisine: string;
+  openingHours: { open: string; close: string };
+  rating: number;
+  reviewCount: number;
+  photoFileId: string | null;
+  photoUrl: string | null;
+  staffRestaurantId: string;
+}
 export interface Dashboard {
   user: StaffProfile; restaurant: Restaurant; tables: StaffTable[]; waiting: number;
   estimate: number; next: Party | null; unread: number;
@@ -36,6 +49,7 @@ export function requestKey() { return `${Date.now()}-${Math.random().toString(36
 export const getStaffData = async <T,>(path: string): Promise<T> => (await staffApi.get<T>(`/api/staff/${path}`)).data;
 export const postStaffData = async <T,>(path: string, body: unknown, key?: string): Promise<T> => (await staffApi.post<T>(`/api/staff/${path}`, body, key ? { headers: { 'Idempotency-Key': key } } : undefined)).data;
 export const patchStaffData = async <T,>(path: string, body: unknown): Promise<T> => (await staffApi.patch<T>(`/api/staff/${path}`, body)).data;
+export const putStaffData = async <T,>(path: string, body: unknown): Promise<T> => (await staffApi.put<T>(`/api/staff/${path}`, body)).data;
 export const getStaffRestaurantPhoto = async (): Promise<StaffRestaurantPhotoResponse> =>
   (await staffApi.get<StaffRestaurantPhotoResponse>('/api/staff/restaurant-photo')).data;
 export const putStaffRestaurantPhoto = async (formData: FormData): Promise<StaffRestaurantPhotoResponse> =>

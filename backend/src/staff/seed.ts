@@ -2,6 +2,7 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import { StaffRestaurant, StaffTable } from './models';
 import { seedStaffAccount } from './seedAccount';
+import Restaurant from '../models/Restaurant';
 
 async function main() {
   const password = process.env.STAFF_SEED_PASSWORD;
@@ -16,7 +17,10 @@ async function main() {
   }
   await mongoose.connect(process.env.MONGODB_URI);
   const restaurantId = 'ember-oak';
-  await StaffRestaurant.updateOne({ _id: restaurantId }, { $setOnInsert: { name: 'Ember & Oak', location: 'Colombo', timeZone: 'Asia/Colombo' } }, { upsert: true });
+  const customerRestaurant = await Restaurant.findOne({ name: 'Ember & Oak' });
+  const staffRestSet: Record<string, unknown> = { name: 'Ember & Oak', location: 'Colombo', timeZone: 'Asia/Colombo' };
+  if (customerRestaurant) staffRestSet.customerRestaurantId = customerRestaurant._id;
+  await StaffRestaurant.updateOne({ _id: restaurantId }, { $setOnInsert: staffRestSet, $set: customerRestaurant ? { customerRestaurantId: customerRestaurant._id } : {} }, { upsert: true });
   await seedStaffAccount({
     restaurantId,
     email,

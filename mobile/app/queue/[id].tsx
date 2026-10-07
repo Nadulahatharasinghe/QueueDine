@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { router, Stack, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -19,6 +18,7 @@ import {
   SHADOWS,
 } from '../../src/constants/theme';
 import CustomButton from '../../src/components/CustomButton';
+import AnimatedPopup from '../../src/components/AnimatedPopup';
 import ScreenContainer from '../../src/components/ScreenContainer';
 import { cancelQueue, getQueueStatus } from '../../src/services/queueService';
 import { QueueEntry } from '../../src/types';
@@ -67,6 +67,7 @@ export default function QueueStatusScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
+  const [leavePopup, setLeavePopup] = useState<'confirmation' | 'success' | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -110,26 +111,21 @@ export default function QueueStatusScreen() {
     }
   };
 
+  const leaveQueue = async () => {
+    try {
+      setCancelling(true);
+      setError('');
+      await cancelQueue(id);
+      setLeavePopup('success');
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Could not leave the queue. Please try again.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const onCancel = () => {
-    Alert.alert('Leave Queue', 'Are you sure you want to leave the queue?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, Leave',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setCancelling(true);
-            await cancelQueue(id);
-            Alert.alert('Left Queue', 'You have left the queue.');
-            router.replace('/home');
-          } catch (err: any) {
-            Alert.alert('Error', err?.response?.data?.error || 'Failed to leave queue');
-          } finally {
-            setCancelling(false);
-          }
-        },
-      },
-    ]);
+    setLeavePopup('confirmation');
   };
 
   if (loading) {
@@ -254,7 +250,30 @@ export default function QueueStatusScreen() {
           ]}
           textStyle={waiting ? { color: COLORS.white } : { color: COLORS.textLight }}
         />
+        {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       </ScrollView>
+      <AnimatedPopup
+        visible={leavePopup !== null}
+        variant={leavePopup === 'confirmation' ? 'confirmation' : 'success'}
+        title={leavePopup === 'confirmation' ? 'Leaving the Queue?' : 'You’re All Set!'}
+        message={
+          leavePopup === 'confirmation'
+            ? `Your place is being held at ${restaurant?.name || 'the restaurant'}. Are you sure you want to leave the queue?`
+            : 'You have left the queue successfully. We hope to see you again soon!'
+        }
+        buttonText={leavePopup === 'confirmation' ? 'Yes, Leave Queue' : 'Back to Home'}
+        cancelText="Stay in Queue"
+        onCancel={() => setLeavePopup(null)}
+        onContinue={() => {
+          if (leavePopup === 'confirmation') {
+            setLeavePopup(null);
+            void leaveQueue();
+          } else {
+            setLeavePopup(null);
+            router.replace('/home');
+          }
+        }}
+      />
     </ScreenContainer>
   );
 }

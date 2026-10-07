@@ -8,6 +8,7 @@ import {
   createNotificationsBulk,
   CreateNotificationInput,
 } from './notificationController';
+import { emitStaffNotification, syntheticQueueId } from '../utils/staffSync';
 
 const AVERAGE_WAIT_PER_PARTY_MIN = 2;
 
@@ -27,7 +28,7 @@ const dayKey = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
-const recalculatePositions = async (
+export const recalculatePositions = async (
   restaurantId: mongoose.Types.ObjectId | string
 ): Promise<{
   previousPositions: Record<string, { userId: string; position: number }>;
@@ -158,7 +159,7 @@ export const joinQueue = async (req: AuthRequest, res: Response): Promise<void> 
     const refreshed = entry
       ? await QueueEntry.findById((entry as IQueueEntry)._id).populate(
           'restaurantId',
-          'name location'
+          'name location imageUrl photoFileId'
         )
       : null;
 
@@ -170,6 +171,11 @@ export const joinQueue = async (req: AuthRequest, res: Response): Promise<void> 
       message: `You have joined the queue at ${restName}. Your number is Q-${String(queueNumber).padStart(3, '0')}.`,
       relatedId: (entry as IQueueEntry)._id,
       relatedType: 'queue',
+    });
+    void emitStaffNotification(String(rid), {
+      category: 'Queue',
+      message: `Customer joined queue Q-${String(queueNumber).padStart(3, '0')} for ${guests} guests`,
+      partyId: syntheticQueueId((entry as IQueueEntry)._id),
     });
 
     // Notify user that became next (position=1) if any
@@ -237,8 +243,8 @@ export const getActiveQueue = async (req: AuthRequest, res: Response): Promise<v
     const entry = await QueueEntry.findOne({
       userId,
       restaurantId,
-      status: 'waiting',
-    }).populate('restaurantId', 'name location');
+      status: { $in: ['waiting', 'called'] },
+    }).populate('restaurantId', 'name location imageUrl photoFileId');
 
     if (!entry) {
       res.status(200).json({ entry: null });
@@ -266,7 +272,7 @@ export const getQueueHistory = async (req: AuthRequest, res: Response): Promise<
     if (!userId) return;
 
     const entries = await QueueEntry.find({ userId })
-      .populate('restaurantId', 'name location')
+      .populate('restaurantId', 'name location imageUrl photoFileId')
       .sort({ createdAt: -1 });
 
     res.status(200).json(entries);
@@ -285,7 +291,7 @@ export const getQueueStatus = async (req: AuthRequest, res: Response): Promise<v
     if (!userId) return;
 
     const { id } = req.params;
-    const entry = await QueueEntry.findById(id).populate('restaurantId', 'name location');
+    const entry = await QueueEntry.findById(id).populate('restaurantId', 'name location imageUrl photoFileId');
     if (!entry) {
       res.status(404).json({ error: 'Queue entry not found' });
       return;
@@ -295,15 +301,15 @@ export const getQueueStatus = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const { newPositions, previousPositions } = await recalculatePositions(entry.restaurantId);
+    const restaurantId = (entry.restaurantId as unknown as { _id: mongoose.Types.ObjectId })._id;
+    const { newPositions, previousPositions } = await recalculatePositions(restaurantId);
     void notifyPositionChanges(previousPositions, newPositions);
 
-    const refreshed = await QueueEntry.findById(id).populate('restaurantId', 'name location');
-
+    const refreshed = await QueueEntry.findById(id).populate('restaurantId', 'name location imageUrl photoFileId');
     const partiesAhead = refreshed ? Math.max(0, refreshed.position - 1) : 0;
     const calledNumber = refreshed
       ? await QueueEntry.findOne({
-          restaurantId: refreshed.restaurantId as mongoose.Types.ObjectId,
+          restaurantId,
           status: { $in: ['called', 'seated'] as any },
         } as any)
           .sort({ calledAt: -1, seatedAt: -1 })
@@ -330,7 +336,7 @@ export const cancelQueue = async (req: AuthRequest, res: Response): Promise<void
     if (!userId) return;
 
     const { id } = req.params;
-    const entry = await QueueEntry.findById(id).populate('restaurantId', 'name location');
+    const entry = await QueueEntry.findById(id).populate('restaurantId', 'name location imageUrl photoFileId');
     if (!entry) {
       res.status(404).json({ error: 'Queue entry not found' });
       return;
@@ -344,7 +350,7 @@ export const cancelQueue = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const rid = entry.restaurantId;
+    const rid = (entry.restaurantId as unknown as { _id: mongoose.Types.ObjectId })._id;
 
     entry.status = 'cancelled';
     entry.cancelledAt = new Date();
@@ -353,7 +359,7 @@ export const cancelQueue = async (req: AuthRequest, res: Response): Promise<void
     const { previousPositions, newPositions } = await recalculatePositions(rid);
     void notifyPositionChanges(previousPositions, newPositions);
 
-    const refreshed = await QueueEntry.findById(id).populate('restaurantId', 'name location');
+    const refreshed = await QueueEntry.findById(id).populate('restaurantId', 'name location imageUrl photoFileId');
 
     const restName =
       typeof entry.restaurantId === 'object'
@@ -366,6 +372,11 @@ export const cancelQueue = async (req: AuthRequest, res: Response): Promise<void
       message: `You have left the queue at ${restName}. Your queue number was Q-${String(entry.queueNumber).padStart(3, '0')}.`,
       relatedId: entry._id,
       relatedType: 'queue',
+    });
+    void emitStaffNotification(String(rid), {
+      category: 'Queue',
+      message: `Customer left queue Q-${String(entry.queueNumber).padStart(3, '0')} (was for ${entry.guests} guests)`,
+      partyId: syntheticQueueId(entry._id),
     });
 
     res.status(200).json(refreshed);

@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Dashboard,
+  EditableStaffRestaurant,
   Party,
   StaffEvent,
   StaffTable,
@@ -12,6 +13,7 @@ import {
   patchStaffData,
   postStaffData,
   putStaffRestaurantPhoto,
+  putStaffData,
   requestKey,
 } from '../../services/staffData';
 import { StaffProfile, signOutStaff, updateStaff, useStaffSession } from '../../services/staffAuth';
@@ -216,6 +218,17 @@ export function NotificationsScreen() {
 }
 export function ProfileScreen() {
   const user = useStaffSession(), mutation = useMutation(), dash = useStaffResource<Dashboard>('dashboard'), [confirm, setConfirm] = useState(false);
+  const restaurantResource = useStaffResource<EditableStaffRestaurant>('restaurant', false);
+  const restaurantMutation = useMutation();
+  const [restaurantForm, setRestaurantForm] = useState({
+    name: '',
+    description: '',
+    location: '',
+    cuisine: '',
+    open: '',
+    close: '',
+  });
+  const [restaurantSaved, setRestaurantSaved] = useState(false);
   const photoMutation = useMutation();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoLoaded, setPhotoLoaded] = useState(false);
@@ -236,12 +249,47 @@ export function ProfileScreen() {
   useEffect(() => { void loadPhoto(); }, [loadPhoto]);
 
   useEffect(() => {
+    if (!restaurantResource.data) return;
+    setRestaurantForm({
+      name: restaurantResource.data.name,
+      description: restaurantResource.data.description,
+      location: restaurantResource.data.location,
+      cuisine: restaurantResource.data.cuisine || '',
+      open: restaurantResource.data.openingHours.open,
+      close: restaurantResource.data.openingHours.close,
+    });
+  }, [restaurantResource.data]);
+
+  useEffect(() => {
     if (!successMsg) return;
     const t = setTimeout(() => setSuccessMsg(null), 3000);
     return () => clearTimeout(t);
   }, [successMsg]);
 
   const effectivePhotoUrl = photoUrl ?? dash.data?.restaurant?.photoUrl ?? null;
+
+  const saveRestaurant = () => {
+    void restaurantMutation.run(async () => {
+      const saved = await putStaffData<EditableStaffRestaurant>('restaurant', {
+        name: restaurantForm.name,
+        description: restaurantForm.description,
+        location: restaurantForm.location,
+        cuisine: restaurantForm.cuisine,
+        openingHours: { open: restaurantForm.open, close: restaurantForm.close },
+      });
+      setRestaurantForm({
+        name: saved.name,
+        description: saved.description,
+        location: saved.location,
+        cuisine: saved.cuisine || '',
+        open: saved.openingHours.open,
+        close: saved.openingHours.close,
+      });
+      setRestaurantSaved(true);
+      void dash.reload();
+      void restaurantResource.reload();
+    });
+  };
 
   const pickAndUpload = async () => {
     try {
@@ -310,6 +358,23 @@ export function ProfileScreen() {
 
   return <StaffShell title="" tab="profile" headerAction={<Pressable onPress={() => go('settings')} style={ui.headerButton} accessibilityRole="button" accessibilityLabel="Settings"><Text style={{ fontSize: 23, color: '#697386' }}>⚙</Text></Pressable>}>
     <View style={styles.profileHero}><View style={styles.profileAvatar}><Text style={styles.profileInitial}>{user?.fullName.split(' ').map(n => n[0]).slice(0, 2).join('')}</Text></View><Text style={styles.largeTitle}>{user?.fullName}</Text><Text style={ui.muted}>{user?.role === 'host' ? 'Host' : user?.role}</Text><Text style={ui.muted}>{dash.data?.restaurant?.name} · {dash.data?.restaurant?.location}</Text><Text style={styles.legendText}>Powered by QueueDine</Text></View>
+
+    <Card>
+      <Text style={ui.label}>RESTAURANT INFORMATION</Text>
+      {restaurantResource.loading ? <ActivityIndicator color={burgundy} /> : null}
+      <Feedback error={restaurantResource.error} retry={() => { void restaurantResource.reload(); }} />
+      {restaurantResource.data ? <>
+        <Field label="RESTAURANT NAME" value={restaurantForm.name} onChangeText={name => { setRestaurantSaved(false); setRestaurantForm(value => ({ ...value, name })); }} />
+        <Field label="LOCATION" value={restaurantForm.location} onChangeText={location => { setRestaurantSaved(false); setRestaurantForm(value => ({ ...value, location })); }} />
+        <Field label="DESCRIPTION" value={restaurantForm.description} multiline onChangeText={description => { setRestaurantSaved(false); setRestaurantForm(value => ({ ...value, description })); }} />
+        <Field label="CUISINE" value={restaurantForm.cuisine} onChangeText={cuisine => { setRestaurantSaved(false); setRestaurantForm(value => ({ ...value, cuisine })); }} />
+        <Field label="OPENING TIME (HH:MM)" value={restaurantForm.open} placeholder="11:00" onChangeText={open => { setRestaurantSaved(false); setRestaurantForm(value => ({ ...value, open })); }} />
+        <Field label="CLOSING TIME (HH:MM)" value={restaurantForm.close} placeholder="23:00" onChangeText={close => { setRestaurantSaved(false); setRestaurantForm(value => ({ ...value, close })); }} />
+        <Button title="Save Restaurant Information" busy={restaurantMutation.busy} disabled={restaurantMutation.busy} onPress={saveRestaurant} />
+        {restaurantSaved && <Text style={{ color: '#208064' }}>Restaurant information saved.</Text>}
+      </> : null}
+      <Feedback error={restaurantMutation.error} />
+    </Card>
 
     <Card>
       <Text style={ui.label}>RESTAURANT PHOTO</Text>

@@ -8,6 +8,7 @@ import {
   createNotification,
   CreateNotificationInput,
 } from './notificationController';
+import { emitStaffNotification, syntheticPartyId } from '../utils/staffSync';
 
 type SlotLabel = 'Available' | 'Limited' | 'Unavailable';
 interface TimeSlot {
@@ -277,13 +278,14 @@ export const createReservation = async (req: AuthRequest, res: Response): Promis
 
     const populated = reservation
       ? await Reservation.findById((reservation as IReservation)._id)
-          .populate('restaurantId', 'name location')
+          .populate('restaurantId', 'name location imageUrl photoFileId')
           .populate('tableId', 'tableNumber capacity')
       : null;
 
     // Create notification
     const restName = restaurant?.name || 'Restaurant';
     const displayTime = TIME_SLOT_LABELS[normalizedTime] || normalizedTime;
+    const displayNumber = `R-${String((reservation as IReservation)._id).slice(-6).toUpperCase()}`;
     void createNotification({
       userId,
       type: 'reservation_created',
@@ -291,6 +293,11 @@ export const createReservation = async (req: AuthRequest, res: Response): Promis
       message: `Your reservation at ${restName} on ${date} at ${displayTime} for ${guests} guests has been confirmed.`,
       relatedId: (reservation as IReservation)._id,
       relatedType: 'reservation',
+    });
+    void emitStaffNotification(restaurantId, {
+      category: 'Reservations',
+      message: `New reservation ${displayNumber}: ${guests} guests on ${date} at ${displayTime}`,
+      partyId: syntheticPartyId((reservation as IReservation)._id),
     });
 
     res.status(201).json(populated);
@@ -309,7 +316,7 @@ export const getMyReservations = async (req: AuthRequest, res: Response): Promis
     if (!userId) return;
 
     const reservations = await Reservation.find({ userId })
-      .populate('restaurantId', 'name location')
+      .populate('restaurantId', 'name location imageUrl photoFileId')
       .populate('tableId', 'tableNumber capacity')
       .sort({ createdAt: -1 });
 
@@ -330,7 +337,7 @@ export const getReservationById = async (req: AuthRequest, res: Response): Promi
 
     const { id } = req.params;
     const reservation = await Reservation.findById(id)
-      .populate('restaurantId', 'name location')
+      .populate('restaurantId', 'name location imageUrl photoFileId')
       .populate('tableId', 'tableNumber capacity');
 
     if (!reservation) {
@@ -360,7 +367,7 @@ export const cancelReservation = async (req: AuthRequest, res: Response): Promis
     const { id } = req.params;
     const reservation = await Reservation.findById(id).populate(
       'restaurantId',
-      'name location'
+      'name location imageUrl photoFileId'
     );
     if (!reservation) {
       res.status(404).json({ error: 'Reservation not found' });
@@ -370,6 +377,7 @@ export const cancelReservation = async (req: AuthRequest, res: Response): Promis
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
+    const restaurantId = (reservation.restaurantId as unknown as { _id: mongoose.Types.ObjectId })._id;
     if (reservation.status === 'cancelled') {
       res.status(400).json({ error: 'Reservation is already cancelled' });
       return;
@@ -384,7 +392,7 @@ export const cancelReservation = async (req: AuthRequest, res: Response): Promis
     await reservation.save();
 
     const populated = await Reservation.findById(reservation._id)
-      .populate('restaurantId', 'name location')
+      .populate('restaurantId', 'name location imageUrl photoFileId')
       .populate('tableId', 'tableNumber capacity');
 
     const restName =
@@ -392,6 +400,7 @@ export const cancelReservation = async (req: AuthRequest, res: Response): Promis
         ? (populated.restaurantId as any).name
         : 'Restaurant';
     const displayTime = TIME_SLOT_LABELS[reservation.time] || reservation.time;
+    const displayNumber = `R-${String(reservation._id).slice(-6).toUpperCase()}`;
     void createNotification({
       userId,
       type: 'reservation_cancelled',
@@ -399,6 +408,11 @@ export const cancelReservation = async (req: AuthRequest, res: Response): Promis
       message: `Your reservation at ${restName} on ${reservation.date} at ${displayTime} has been cancelled.`,
       relatedId: reservation._id,
       relatedType: 'reservation',
+    });
+    void emitStaffNotification(String(restaurantId), {
+      category: 'Reservations',
+      message: `Reservation ${displayNumber} cancelled by customer (was ${reservation.date} at ${displayTime})`,
+      partyId: syntheticPartyId(reservation._id),
     });
 
     res.status(200).json(populated);
@@ -534,7 +548,7 @@ export const modifyReservation = async (req: AuthRequest, res: Response): Promis
     await reservation.save();
 
     const populated = await Reservation.findById(reservation._id)
-      .populate('restaurantId', 'name location')
+      .populate('restaurantId', 'name location imageUrl photoFileId')
       .populate('tableId', 'tableNumber capacity');
 
     const restName =
@@ -542,6 +556,7 @@ export const modifyReservation = async (req: AuthRequest, res: Response): Promis
         ? (populated.restaurantId as any).name
         : 'Restaurant';
     const displayTime = TIME_SLOT_LABELS[newTime] || newTime;
+    const displayNumber = `R-${String(reservation._id).slice(-6).toUpperCase()}`;
     void createNotification({
       userId,
       type: 'reservation_modified',
@@ -549,6 +564,11 @@ export const modifyReservation = async (req: AuthRequest, res: Response): Promis
       message: `Your reservation at ${restName} has been updated to ${newDate} at ${displayTime} for ${newGuests} guests.`,
       relatedId: reservation._id,
       relatedType: 'reservation',
+    });
+    void emitStaffNotification(String(reservation.restaurantId), {
+      category: 'Reservations',
+      message: `Reservation ${displayNumber} updated by customer: ${newGuests} guests on ${newDate} at ${displayTime}`,
+      partyId: syntheticPartyId(reservation._id),
     });
 
     res.status(200).json(populated);

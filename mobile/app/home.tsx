@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING, BORDER_RADIUS, SHADOWS } from '../src/constants/theme';
 import Logo from '../src/components/Logo';
@@ -15,6 +15,8 @@ export default function HomePage() {
   const [greeting, setGreeting] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [restaurantLoading, setRestaurantLoading] = useState(true);
+  const [restaurantError, setRestaurantError] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
 
   const loadUserData = async () => {
@@ -54,9 +56,14 @@ export default function HomePage() {
     setGreetingBasedOnTime();
     (async () => {
       try {
+        setRestaurantLoading(true);
+        setRestaurantError('');
         setRestaurant(await getFirstRestaurant());
-      } catch {
+      } catch (e: any) {
         setRestaurant(null);
+        setRestaurantError(e?.response?.data?.error || 'Failed to load restaurant from the server.');
+      } finally {
+        setRestaurantLoading(false);
       }
     })();
   }, []);
@@ -102,35 +109,68 @@ export default function HomePage() {
                   resizeMode="cover"
                   onError={() => setImageFailed(true)}
                 />
+              ) : restaurantLoading ? (
+                <ActivityIndicator color={COLORS.primary} />
               ) : (
-                <Text style={styles.restaurantImagePlaceholder}>Restaurant Image</Text>
+                <Text style={styles.restaurantImagePlaceholder}>No photo</Text>
               )}
             </View>
-            <View style={styles.restaurantInfo}>
-              <Text style={styles.restaurantName}>{restaurant?.name || 'Ember & Oak'}</Text>
-              <View style={styles.ratingContainer}>
-                <Text style={styles.rating}>4.6</Text>
-                <Text style={styles.reviewCount}>(1.2k reviews)</Text>
+            {restaurantLoading ? (
+              <View style={styles.restaurantInfo}>
+                <ActivityIndicator color={COLORS.primary} />
               </View>
-              <Text style={styles.location}>{restaurant?.location || 'Colombo, Sri Lanka'}</Text>
-            </View>
+            ) : restaurantError ? (
+              <View style={styles.restaurantInfo}>
+                <Text style={[styles.location, { color: COLORS.error }]}>{restaurantError}</Text>
+              </View>
+            ) : !restaurant ? (
+              <View style={styles.restaurantInfo}>
+                <Text style={[styles.location, { color: COLORS.error }]}>Restaurant data unavailable.</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.restaurantInfo}>
+                  <Text style={styles.restaurantName}>{restaurant.name}</Text>
+                  <View style={styles.ratingContainer}>
+                    <Text style={styles.rating}>{restaurant.rating.toFixed(1)}</Text>
+                    <Text style={styles.reviewCount}>
+                      ({restaurant.reviewCount >= 1000
+                        ? `${(restaurant.reviewCount / 1000).toFixed(1)}k`
+                        : String(restaurant.reviewCount)}{' '}
+                      reviews)
+                    </Text>
+                  </View>
+                  <Text style={styles.location}>{restaurant.location}</Text>
+                </View>
 
-            <View style={styles.statsContainer}>
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>~25 mins</Text>
-                <Text style={styles.statLabel}>Current wait</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>12</Text>
-                <Text style={styles.statLabel}>In queue</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>8</Text>
-                <Text style={styles.statLabel}>Tables available</Text>
-              </View>
-            </View>
+                <View style={styles.statsContainer}>
+                  <View style={styles.stat}>
+                    <Text style={styles.statValue}>
+                      {restaurant.currentWaitTime != null
+                        ? `~ ${restaurant.currentWaitTime} mins`
+                        : '\u2014'}
+                    </Text>
+                    <Text style={styles.statLabel}>Current wait</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.stat}>
+                    <Text style={styles.statValue}>
+                      {restaurant.queueLength != null ? String(restaurant.queueLength) : '\u2014'}
+                    </Text>
+                    <Text style={styles.statLabel}>In queue</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.stat}>
+                    <Text style={styles.statValue}>
+                      {restaurant.availableTables != null
+                        ? String(restaurant.availableTables)
+                        : '\u2014'}
+                    </Text>
+                    <Text style={styles.statLabel}>Tables available</Text>
+                  </View>
+                </View>
+              </>
+            )}
 
             <View style={styles.actionButtons}>
               <CustomButton
@@ -138,12 +178,14 @@ export default function HomePage() {
                 onPress={() => router.push('/restaurant')}
                 variant="primary"
                 style={styles.actionButton}
+                disabled={!restaurant}
               />
               <CustomButton
                 title="Join Virtual Queue"
                 onPress={() => router.push('/restaurant')}
                 variant="outline"
                 style={styles.actionButton}
+                disabled={!restaurant}
               />
             </View>
           </View>

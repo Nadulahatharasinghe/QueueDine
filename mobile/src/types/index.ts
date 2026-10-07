@@ -33,7 +33,7 @@ export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'complet
 export interface Reservation {
   _id: string;
   userId: string;
-  restaurantId: string | { _id: string; name: string; location: string };
+  restaurantId: string | { _id: string; name: string; location: string; imageUrl?: string | null; photoFileId?: string | null };
   tableId: string | { _id: string; tableNumber: number; capacity: number };
   date: string;
   time: string;
@@ -49,7 +49,7 @@ export type QueueStatus = 'waiting' | 'called' | 'seated' | 'cancelled';
 export interface QueueEntry {
   _id: string;
   userId: string;
-  restaurantId: string | { _id: string; name: string; location: string };
+  restaurantId: string | { _id: string; name: string; location: string; imageUrl?: string | null; photoFileId?: string | null };
   queueNumber: number;
   guests: number;
   position: number;
