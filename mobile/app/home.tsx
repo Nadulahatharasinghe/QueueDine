@@ -7,33 +7,15 @@ import CustomButton from '../src/components/CustomButton';
 import ScreenContainer from '../src/components/ScreenContainer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUnreadCount } from '../src/services/notificationService';
+import { getFirstRestaurant, photoUri } from '../src/services/restaurantService';
+import type { Restaurant } from '../src/types';
 
 export default function HomePage() {
   const [user, setUser] = useState<any>(null);
   const [greeting, setGreeting] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    loadUserData();
-    setGreetingBasedOnTime();
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      let active = true;
-      (async () => {
-        try {
-          const r = await getUnreadCount();
-          if (active) setUnreadCount(r.unreadCount || 0);
-        } catch (_) {
-          if (active) setUnreadCount(0);
-        }
-      })();
-      return () => {
-        active = false;
-      };
-    }, []),
-  );
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
 
   const loadUserData = async () => {
     try {
@@ -67,6 +49,35 @@ export default function HomePage() {
     }
   };
 
+  useEffect(() => {
+    loadUserData();
+    setGreetingBasedOnTime();
+    (async () => {
+      try {
+        setRestaurant(await getFirstRestaurant());
+      } catch {
+        setRestaurant(null);
+      }
+    })();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          const r = await getUnreadCount();
+          if (active) setUnreadCount(r.unreadCount || 0);
+        } catch {
+          if (active) setUnreadCount(0);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
   return (
     <ScreenContainer>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -84,15 +95,24 @@ export default function HomePage() {
 
           <View style={styles.restaurantCard}>
             <View style={styles.restaurantImage}>
-              <Text style={styles.restaurantImagePlaceholder}>Restaurant Image</Text>
+              {!imageFailed && restaurant?.imageUrl && photoUri(restaurant.imageUrl) ? (
+                <Image
+                  source={{ uri: photoUri(restaurant.imageUrl)! }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                <Text style={styles.restaurantImagePlaceholder}>Restaurant Image</Text>
+              )}
             </View>
             <View style={styles.restaurantInfo}>
-              <Text style={styles.restaurantName}>Ember & Oak</Text>
+              <Text style={styles.restaurantName}>{restaurant?.name || 'Ember & Oak'}</Text>
               <View style={styles.ratingContainer}>
                 <Text style={styles.rating}>4.6</Text>
                 <Text style={styles.reviewCount}>(1.2k reviews)</Text>
               </View>
-              <Text style={styles.location}>Colombo, Sri Lanka</Text>
+              <Text style={styles.location}>{restaurant?.location || 'Colombo, Sri Lanka'}</Text>
             </View>
 
             <View style={styles.statsContainer}>

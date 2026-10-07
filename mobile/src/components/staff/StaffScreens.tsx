@@ -1,10 +1,37 @@
-import React, { useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Linking, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Dashboard, Party, StaffEvent, StaffTable, postStaffData, patchStaffData, requestKey } from '../../services/staffData';
+import * as ImagePicker from 'expo-image-picker';
+import {
+  Dashboard,
+  Party,
+  StaffEvent,
+  StaffTable,
+  deleteStaffRestaurantPhoto,
+  getStaffRestaurantPhoto,
+  patchStaffData,
+  postStaffData,
+  putStaffRestaurantPhoto,
+  requestKey,
+} from '../../services/staffData';
 import { StaffProfile, signOutStaff, updateStaff, useStaffSession } from '../../services/staffAuth';
+import { photoUri } from '../../services/restaurantService';
 import { StaffShell, Button, Card, Chip, Empty, Feedback, Field, Filters, PartySize, Search, back, burgundy, elapsed, go, time, tones, ui, useClock, useMutation, useStaffResource } from './StaffUI';
 
+type NativeFilePart = { uri: string; name: string; type: string };
+type NativeFormData = FormData & { append(name: string, value: NativeFilePart): void };
+const photoMimeTypes: Record<string, { extension: string; mimeType: string }> = {
+  'image/jpeg': { extension: 'jpg', mimeType: 'image/jpeg' },
+  'image/jpg': { extension: 'jpg', mimeType: 'image/jpeg' },
+  'image/png': { extension: 'png', mimeType: 'image/png' },
+  'image/webp': { extension: 'webp', mimeType: 'image/webp' },
+};
+const photoExtensions: Record<string, { extension: string; mimeType: string }> = {
+  jpg: photoMimeTypes['image/jpeg'],
+  jpeg: photoMimeTypes['image/jpeg'],
+  png: photoMimeTypes['image/png'],
+  webp: photoMimeTypes['image/webp'],
+};
 const closed = (p: Party) => ['seated', 'cancelled', 'no-show'].includes(p.status);
 const matches = (p: Party, q: string) => `${p.customerName} ${p.number} ${p.mobileNumber}`.toLowerCase().includes(q.toLowerCase());
 function PartyRow({ party }: { party: Party }) {
@@ -189,8 +216,151 @@ export function NotificationsScreen() {
 }
 export function ProfileScreen() {
   const user = useStaffSession(), mutation = useMutation(), dash = useStaffResource<Dashboard>('dashboard'), [confirm, setConfirm] = useState(false);
+  const photoMutation = useMutation();
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoLoaded, setPhotoLoaded] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const loadPhoto = useCallback(async () => {
+    try {
+      const res = await getStaffRestaurantPhoto();
+      setPhotoUrl(res.photoUrl || null);
+    } catch {
+      setPhotoUrl(null);
+    } finally {
+      setPhotoLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => { void loadPhoto(); }, [loadPhoto]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    const t = setTimeout(() => setSuccessMsg(null), 3000);
+    return () => clearTimeout(t);
+  }, [successMsg]);
+
+  const effectivePhotoUrl = photoUrl ?? dash.data?.restaurant?.photoUrl ?? null;
+
+  const pickAndUpload = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted && permission.status !== 'granted') {
+        throw new Error('Photo library permission is required to upload a photo.');
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.9,
+      });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const asset = result.assets[0];
+      const suppliedMimeType = asset.mimeType?.toLowerCase();
+      const extensionFromMime = suppliedMimeType ? photoMimeTypes[suppliedMimeType] : undefined;
+      if (suppliedMimeType && !extensionFromMime) {
+        throw new Error('Only JPG, JPEG, PNG, and WEBP images are allowed.');
+      }
+      const fileNameExtension = asset.fileName?.match(/\.([^.]+)$/)?.[1].toLowerCase();
+      const uriExtension = asset.uri.match(/\.([^.\/?#]+)(?:[?#]|$)/)?.[1].toLowerCase();
+      const imageType = extensionFromMime ||
+        (fileNameExtension ? photoExtensions[fileNameExtension] : undefined) ||
+        (uriExtension ? photoExtensions[uriExtension] : undefined);
+      if (!imageType) {
+        throw new Error('Only JPG, JPEG, PNG, and WEBP images are allowed.');
+      }
+      if (typeof asset.fileSize === 'number' && asset.fileSize > 5 * 1024 * 1024) {
+        throw new Error('Photo exceeds the 5 MB limit.');
+      }
+      const form = new FormData();
+      const fileName = fileNameExtension && photoExtensions[fileNameExtension]
+        ? asset.fileName!
+        : `photo-${Date.now()}.${imageType.extension}`;
+      if (Platform.OS === 'web') {
+        if (!asset.file) throw new Error('Unable to read the selected photo. Please choose it again.');
+        form.append('photo', asset.file, fileName);
+      } else {
+        (form as NativeFormData).append('photo', {
+          uri: asset.uri,
+          name: fileName,
+          type: imageType.mimeType,
+        });
+      }
+      await photoMutation.run(async () => {
+        const res = await putStaffRestaurantPhoto(form);
+        setPhotoUrl(res.photoUrl || null);
+        setSuccessMsg('Photo saved successfully.');
+        setRemoveConfirm(false);
+        void dash.reload();
+      });
+    } catch (cause: unknown) {
+      photoMutation.run(async () => { throw cause; }).catch(() => undefined);
+    }
+  };
+
+  const removePhoto = async () => {
+    await photoMutation.run(async () => {
+      await deleteStaffRestaurantPhoto();
+      setPhotoUrl(null);
+      setRemoveConfirm(false);
+      setSuccessMsg('Photo removed.');
+      void dash.reload();
+    });
+  };
+
   return <StaffShell title="" tab="profile" headerAction={<Pressable onPress={() => go('settings')} style={ui.headerButton} accessibilityRole="button" accessibilityLabel="Settings"><Text style={{ fontSize: 23, color: '#697386' }}>⚙</Text></Pressable>}>
     <View style={styles.profileHero}><View style={styles.profileAvatar}><Text style={styles.profileInitial}>{user?.fullName.split(' ').map(n => n[0]).slice(0, 2).join('')}</Text></View><Text style={styles.largeTitle}>{user?.fullName}</Text><Text style={ui.muted}>{user?.role === 'host' ? 'Host' : user?.role}</Text><Text style={ui.muted}>{dash.data?.restaurant?.name} · {dash.data?.restaurant?.location}</Text><Text style={styles.legendText}>Powered by QueueDine</Text></View>
+
+    <Card>
+      <Text style={ui.label}>RESTAURANT PHOTO</Text>
+      <View style={{ borderRadius: 14, backgroundColor: '#F4F5F7', borderWidth: 1, borderColor: '#E4E7EC', overflow: 'hidden', marginBottom: 12 }}>
+        {!photoLoaded ? (
+          <ActivityIndicator color={burgundy} style={{ height: 160 }} />
+        ) : effectivePhotoUrl ? (
+          <View style={{ position: 'relative' }}>
+            <Image
+              source={{ uri: photoUri(effectivePhotoUrl) || undefined }}
+              style={{ width: '100%', height: 160 }}
+              resizeMode="cover"
+              onError={() => setPhotoUrl(null)}
+            />
+            {photoMutation.busy && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.55)', alignItems: 'center', justifyContent: 'center' }]}>
+                <ActivityIndicator color={burgundy} />
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={{ height: 160, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={ui.muted}>No photo uploaded</Text>
+          </View>
+        )}
+      </View>
+      {successMsg ? <Text style={{ color: '#208064', marginBottom: 12, fontSize: 13 }}>{successMsg}</Text> : null}
+      {effectivePhotoUrl ? (
+        <View style={{ gap: 10 }}>
+          <Button title="Change Photo" secondary busy={photoMutation.busy} disabled={photoMutation.busy} onPress={() => { void pickAndUpload(); }} />
+          {!removeConfirm ? (
+            <Button title="Remove Photo" secondary danger busy={photoMutation.busy} disabled={photoMutation.busy} onPress={() => setRemoveConfirm(true)} />
+          ) : (
+            <Card>
+              <View style={{ backgroundColor: '#FFF1F2', borderColor: '#F0CED5', borderWidth: 1, borderRadius: 12, padding: 12 }}>
+                <Text style={ui.heading}>Remove the restaurant photo?</Text>
+                <Text style={ui.muted}>Customers will see a placeholder instead.</Text>
+                <View style={{ height: 12 }} />
+                <Button title="Confirm Removal" danger busy={photoMutation.busy} onPress={() => { void removePhoto(); }} />
+                <View style={{ height: 10 }} />
+                <Button title="Keep Photo" secondary onPress={() => setRemoveConfirm(false)} />
+              </View>
+            </Card>
+          )}
+        </View>
+      ) : (
+        <Button title="Upload Photo" busy={photoMutation.busy} disabled={photoMutation.busy} onPress={() => { void pickAndUpload(); }} />
+      )}
+      <Feedback error={photoMutation.error} />
+    </Card>
+
     {[['shift', '▦', 'Shift Details'], ['settings', '⚙', 'Settings'], ['activity', '◷', 'Recent Activity'], ['notifications', '♧', 'Notifications'], ['help', '?', 'Help & Support']].map(([screen, icon, label]) => <Pressable key={screen} onPress={() => go(screen)} accessibilityRole="button"><Card><View style={ui.row}><Text style={{ fontSize: 21, color: '#697386' }}>{icon}</Text><Text style={[ui.heading, ui.grow, { fontWeight: '400' }]}>{label}</Text><Text style={ui.muted}>›</Text></View></Card></Pressable>)}
     {confirm ? <Card><Text style={ui.heading}>Sign out of the staff portal?</Text><Button title="Confirm Logout" busy={mutation.busy} onPress={() => { void mutation.run(async () => { await signOutStaff(); }); }} /><Button title="Stay Signed In" secondary onPress={() => setConfirm(false)} /></Card> : <Button title="Logout" secondary onPress={() => setConfirm(true)} />}<Feedback error={mutation.error} />
   </StaffShell>;

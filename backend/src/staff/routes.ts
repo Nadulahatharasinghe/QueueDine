@@ -5,6 +5,9 @@ import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
 import { StaffAccount, StaffSession, StaffRestaurant, StaffTable, StaffParty, StaffEvent, StaffNotification, StaffAlert } from './models';
 import { StaffError, text, partyInput, bookingTime, waitEstimate, terminalStatuses } from './domain';
+import { upload } from '../utils/upload';
+import { storePhoto, deleteFileIfExists } from '../utils/gridfs';
+import { resolveStaffRestaurant } from '../utils/restaurantLink';
 
 type Account = HydratedDocument<InferSchemaType<typeof StaffAccount.schema>>;
 const wrap = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => { void fn(req, res, next).catch(next); };
@@ -234,6 +237,70 @@ staffRoutes.patch('/notifications/:id/read', wrap(async (req, res) => {
   const a = account(res);
   const n = await StaffNotification.findOneAndUpdate({ _id: String(req.params.id), restaurantId: a.restaurantId }, { $addToSet: { readBy: a._id } }, { returnDocument: 'after' });
   if (!n) throw new StaffError(404, 'Notification not found.'); res.json(n);
+}));
+staffRoutes.get('/restaurant-photo', wrap(async (_req, res) => {
+  const a = account(res);
+  const { customerRestaurant } = await resolveStaffRestaurant(a);
+  res.json({
+    success: true,
+    restaurantId: String(customerRestaurant._id),
+    restaurantName: customerRestaurant.name,
+    photoFileId: customerRestaurant.photoFileId ? String(customerRestaurant.photoFileId) : null,
+    photoUrl: customerRestaurant.imageUrl || null,
+  });
+}));
+staffRoutes.put('/restaurant-photo', (req, res, next) => {
+  upload.single('photo')(req, res, (err: any) => {
+    if (err) {
+      if (err?.code === 'LIMIT_FILE_SIZE') {
+        res.status(413).json({ error: 'Photo exceeds the 5 MB limit.' });
+        return;
+      }
+      const message = err?.message || 'Unable to process the uploaded file.';
+      if (/Only|allowed/i.test(message)) {
+        res.status(400).json({ error: message });
+      } else {
+        res.status(400).json({ error: message });
+      }
+      return;
+    }
+    void (async () => {
+      try {
+        const a = account(res);
+        const file = (req as any).file;
+        if (!file) throw new StaffError(400, 'No photo file selected.');
+        if (!file.buffer || file.buffer.length === 0) throw new StaffError(400, 'Uploaded file is empty.');
+        const { customerRestaurant } = await resolveStaffRestaurant(a);
+        const stored = await storePhoto(file.buffer, {
+          filename: `restaurant-${customerRestaurant._id}-${Date.now()}`,
+          contentType: file.mimetype || 'image/jpeg',
+          restaurantId: String(customerRestaurant._id),
+        });
+        const previousFileId = customerRestaurant.photoFileId;
+        customerRestaurant.photoFileId = stored._id;
+        customerRestaurant.imageUrl = `/api/restaurants/${customerRestaurant._id}/photo`;
+        await customerRestaurant.save();
+        if (previousFileId) await deleteFileIfExists(previousFileId);
+        res.json({
+          success: true,
+          restaurantId: String(customerRestaurant._id),
+          restaurantName: customerRestaurant.name,
+          photoFileId: String(stored._id),
+          photoUrl: customerRestaurant.imageUrl,
+        });
+      } catch (cause) { next(cause); }
+    })();
+  });
+});
+staffRoutes.delete('/restaurant-photo', wrap(async (_req, res) => {
+  const a = account(res);
+  const { customerRestaurant } = await resolveStaffRestaurant(a);
+  const previousFileId = customerRestaurant.photoFileId;
+  customerRestaurant.photoFileId = null;
+  customerRestaurant.imageUrl = null;
+  await customerRestaurant.save();
+  if (previousFileId) await deleteFileIfExists(previousFileId);
+  res.json({ success: true, message: 'Photo removed.' });
 }));
 staffRoutes.get('/activity', wrap(async (req, res) => {
   const filter: Record<string, unknown> = { restaurantId: account(res).restaurantId };

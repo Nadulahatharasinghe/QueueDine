@@ -19,7 +19,7 @@ import {
 } from '../src/constants/theme';
 import CustomButton from '../src/components/CustomButton';
 import ScreenContainer from '../src/components/ScreenContainer';
-import { getFirstRestaurant } from '../src/services/restaurantService';
+import { getFirstRestaurant, photoUri } from '../src/services/restaurantService';
 import { Restaurant as RestaurantType } from '../src/types';
 
 export default function RestaurantScreen() {
@@ -27,6 +27,7 @@ export default function RestaurantScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'Overview' | 'Menu' | 'Info'>('Overview');
+  const [imageFailed, setImageFailed] = useState(false);
 
   const loadRestaurant = async () => {
     try {
@@ -85,11 +86,20 @@ export default function RestaurantScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={styles.heroContainer}>
           <View style={styles.hero}>
-            <Image
-              source={require('../assets/welcome_page_background_image.png')}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
+            {!imageFailed && restaurant.imageUrl && photoUri(restaurant.imageUrl) ? (
+              <Image
+                source={{ uri: photoUri(restaurant.imageUrl)! }}
+                style={styles.heroImage}
+                resizeMode="cover"
+                onError={() => setImageFailed(true)}
+              />
+            ) : (
+              <Image
+                source={require('../assets/welcome_page_background_image.png')}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+            )}
             <View style={styles.heroOverlay} />
           </View>
           <TouchableOpacity

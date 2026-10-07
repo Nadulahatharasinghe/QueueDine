@@ -8,6 +8,7 @@ const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const database_1 = require("./config/database");
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
+const routes_1 = require("./staff/routes");
 const settingsRoutes_1 = __importDefault(require("./routes/settingsRoutes"));
 const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const restaurantRoutes_1 = __importDefault(require("./routes/restaurantRoutes"));
@@ -23,6 +24,7 @@ const PORT = process.env.PORT || 5000;
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 app.use('/api/auth', authRoutes_1.default);
+app.use('/api/staff', routes_1.staffRoutes);
 app.use('/api/settings', settingsRoutes_1.default);
 app.use('/api/users', userRoutes_1.default);
 app.use('/api/restaurants', restaurantRoutes_1.default);
@@ -38,6 +40,24 @@ const startServer = async () => {
     try {
         await (0, database_1.connectDatabase)();
         await (0, seed_1.seedRestaurantData)();
+        // A persisted expiry survives restarts; the worker releases reservation holds.
+        let releasingHolds = false;
+        const releaseHolds = async () => {
+            if (releasingHolds)
+                return;
+            releasingHolds = true;
+            try {
+                await (0, routes_1.releaseExpiredHolds)();
+            }
+            catch {
+                console.error('Unable to release expired staff holds; retrying shortly.');
+            }
+            finally {
+                releasingHolds = false;
+            }
+        };
+        void releaseHolds();
+        setInterval(() => { void releaseHolds(); }, 15000).unref();
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });
