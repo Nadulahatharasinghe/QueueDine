@@ -9,7 +9,7 @@ The portal uses the existing Expo app and Express backend. Customer screens, the
 3. Create the initial staff account and table layout **once**. This explicitly writes new staff records to the database named by `MONGODB_URI`; it does not modify customer records. Agree on using the shared cluster with its owner first. In PowerShell, from `backend`:
 
    ```powershell
-   $env:STAFF_SEED_EMAIL = 'host@example.com'
+   $env:STAFF_SEED_EMAIL = 'host@queuedine.local'
    $env:STAFF_SEED_ID = 'host-001'
    $env:STAFF_SEED_NAME = 'Tharindu Silva'
    $staffPassword = Read-Host 'Choose a staff password (at least 10 characters)' -AsSecureString
@@ -19,6 +19,8 @@ The portal uses the existing Expo app and Express backend. Customer screens, the
    ```
 
    Setup creates Ember & Oak, one host account, and twelve available tables (nine Main Area, three Outdoor). Re-running preserves existing staff passwords and table states. No fictitious customers are inserted. Do not use your MongoDB database password as a staff login password.
+
+   To reset **only** the seeded `host@queuedine.local` / `host-001` password during local development, set `$env:NODE_ENV = 'development'` and `$env:STAFF_SEED_RESET_PASSWORD = 'true'` before `npm run staff:setup`, then remove both afterward. Reset is rejected unless `NODE_ENV` is `development` or `test`, and the seed command refuses to reset any other account identity. The new password is the value supplied through `STAFF_SEED_PASSWORD`; the command does not generate or print a password.
 4. Start the backend: `npm run dev` from `backend`.
 5. Set `mobile/.env` to `EXPO_PUBLIC_API_URL=http://localhost:5000` for web, or `http://YOUR_COMPUTER_WIFI_IP:5000` for your phone. Keep the phone and computer on the same Wi-Fi; allow port 5000 through the computer firewall. An Expo tunnel does not tunnel your API.
 6. From `mobile`, run `npx expo start --web --clear` (web) or `npx expo start --go --clear` (phone).
