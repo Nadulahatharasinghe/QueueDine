@@ -17,6 +17,8 @@ backend/npm-debug.*
 backend/*.log
 backend/.env.local
 backend/.env.*.local
+backend/node_modules
+backend/dist
 
 # Environment variables
 .env
@@ -47,3 +49,7 @@ yarn-error.log*
 
 # OS
 Thumbs.db
+screens/
+docs/
+
+.env
