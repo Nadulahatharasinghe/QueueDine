@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node -r dotenv/config dist/server.js",
     "dev": "npx tsx --env-file=.env src/server.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "staff:setup": "tsx src/staff/seed.ts",
+    "test:staff": "tsx --test tests/staff.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -22,11 +24,13 @@
     "multer": "^2.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.3",
+    "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.15",

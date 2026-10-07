@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING, BORDER_RADIUS } from '../src/constants/theme';
 import Logo from '../src/components/Logo';
 import CustomButton from '../src/components/CustomButton';
@@ -60,9 +60,15 @@ export default function LoginPage() {
             <TouchableOpacity style={[styles.userTypeButton, styles.activeUserType]}>
               <Text style={[styles.userTypeText, styles.activeUserTypeText]}>Customer</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.userTypeButton}>
-              <Text style={styles.userTypeText}>Restaurant Staff</Text>
-            </TouchableOpacity>
+            <Link href="/staff/login" asChild>
+              <TouchableOpacity
+                style={styles.userTypeButton}
+                accessibilityRole="link"
+                accessibilityLabel="Restaurant Staff login"
+              >
+                <Text style={styles.userTypeText}>Restaurant Staff</Text>
+              </TouchableOpacity>
+            </Link>
           </View>
 
           <Text style={styles.description}>

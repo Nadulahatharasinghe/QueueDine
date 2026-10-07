@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/authRoutes';
+import { staffRoutes, releaseExpiredHolds } from './staff/routes';
 import settingsRoutes from './routes/settingsRoutes';
 import userRoutes from './routes/userRoutes';
 import restaurantRoutes from './routes/restaurantRoutes';
@@ -22,6 +23,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
+app.use('/api/staff', staffRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/restaurants', restaurantRoutes);
@@ -40,6 +42,18 @@ const startServer = async (): Promise<void> => {
   try {
     await connectDatabase();
     await seedRestaurantData();
+
+    // A persisted expiry survives restarts; the worker releases reservation holds.
+    let releasingHolds = false;
+    const releaseHolds = async () => {
+      if (releasingHolds) return;
+      releasingHolds = true;
+      try { await releaseExpiredHolds(); }
+      catch { console.error('Unable to release expired staff holds; retrying shortly.'); }
+      finally { releasingHolds = false; }
+    };
+    void releaseHolds();
+    setInterval(() => { void releaseHolds(); }, 15000).unref();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
