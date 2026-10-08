@@ -53,14 +53,18 @@ export default function StaffLogin() {
     }
     setLoading(true);
     try {
-      await signInStaff(identifier.trim(), password);
+      const user = await signInStaff(identifier.trim(), password);
       // Remember the identifier only, never the password.
       try {
         if (remember) await AsyncStorage.setItem(rememberedIdKey, identifier.trim());
         else await AsyncStorage.removeItem(rememberedIdKey);
       } catch { /* Login can continue when preferences cannot be saved. */ }
       setPassword('');
-      router.replace('/staff/dashboard');
+      if (user.role === 'manager') {
+        router.replace('/manager/dashboard');
+      } else {
+        router.replace('/staff/dashboard');
+      }
     } catch (cause) {
       if (isAxiosError(cause)) {
         if (cause.response?.status === 404) setError('Staff sign-in is not available yet. Please contact your manager.');
