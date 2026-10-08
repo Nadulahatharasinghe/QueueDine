@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ManagerShell,
@@ -13,11 +13,13 @@ import {
   ClockIcon,
   TrendUpIcon,
   WarningIcon,
+  CheckIcon,
 } from '../../src/components/manager/ManagerIcons';
 import {
   getDailyReportPreview,
   getReportById,
   generateAndSaveReport,
+  downloadReportFile,
   StaffReportData,
 } from '../../src/services/managerData';
 
@@ -29,6 +31,13 @@ export default function DailyReportScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -57,10 +66,30 @@ export default function DailyReportScreen() {
   const handleSaveOrDownload = async () => {
     setSaving(true);
     try {
-      await generateAndSaveReport(data?.date || activeDate, 'Generated and saved from Daily Report');
-      Alert.alert('Report Saved', 'This report has been saved to Report History.');
+      let current = data;
+      if (!current?._id) {
+        current = await generateAndSaveReport(data?.date || activeDate, 'Saved from Daily Report');
+        setData(current);
+      }
+      if (current) {
+        const downloaded = await downloadReportFile(current);
+        if (downloaded) {
+          setToast({
+            type: 'success',
+            text: `Report for ${current.dateLabel || current.date} saved and downloaded as CSV!`,
+          });
+        } else {
+          setToast({
+            type: 'success',
+            text: `Report saved to Report History.`,
+          });
+        }
+      }
     } catch (err: any) {
-      Alert.alert('Notice', err?.response?.data?.error || err?.message || 'Failed to save report.');
+      setToast({
+        type: 'error',
+        text: err?.response?.data?.error || err?.message || 'Failed to save or download report.',
+      });
     } finally {
       setSaving(false);
     }
@@ -69,12 +98,16 @@ export default function DailyReportScreen() {
   const headerAction = (
     <Pressable
       style={styles.downloadBtn}
-      onPress={handleSaveOrDownload}
+      onPress={() => void handleSaveOrDownload()}
       disabled={saving}
       accessibilityRole="button"
-      accessibilityLabel="Save or download report"
+      accessibilityLabel="Save and download report"
     >
-      <DownloadIcon size={20} color={burgundy} />
+      {saving ? (
+        <ActivityIndicator size="small" color={burgundy} />
+      ) : (
+        <DownloadIcon size={20} color={burgundy} />
+      )}
     </Pressable>
   );
 
@@ -86,6 +119,20 @@ export default function DailyReportScreen() {
       onRefresh={loadData}
     >
       <FeedbackBox loading={loading && !data} error={error} retry={loadData} />
+
+      {/* Floating Status Toast */}
+      {toast && (
+        <View style={[styles.toastBanner, toast.type === 'error' ? styles.toastError : styles.toastSuccess]}>
+          {toast.type === 'error' ? (
+            <WarningIcon size={18} color="#B42318" />
+          ) : (
+            <CheckIcon size={18} color="#027A48" />
+          )}
+          <Text style={[styles.toastText, toast.type === 'error' ? styles.toastTextError : styles.toastTextSuccess]}>
+            {toast.text}
+          </Text>
+        </View>
+      )}
 
       {/* Date Subtitle */}
       <Text style={styles.dateCaption}>
@@ -206,5 +253,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: burgundy,
     marginTop: -2,
+  },
+  toastBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+  toastSuccess: {
+    backgroundColor: '#ECFDF3',
+    borderColor: '#A6F4C5',
+  },
+  toastError: {
+    backgroundColor: '#FEF3F2',
+    borderColor: '#FECDCA',
+  },
+  toastText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  toastTextSuccess: {
+    color: '#027A48',
+  },
+  toastTextError: {
+    color: '#B42318',
   },
 });

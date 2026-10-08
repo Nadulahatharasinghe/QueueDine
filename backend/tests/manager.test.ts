@@ -73,9 +73,11 @@ test('manager portal backend integration in isolated replica set', { timeout: 12
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
     return {
       status: response.status,
-      data: response.status === 204 ? null : await response.json(),
+      data: response.status === 204 ? null : (isJson ? await response.json() : await response.text()),
     };
   };
 
@@ -153,6 +155,12 @@ test('manager portal backend integration in isolated replica set', { timeout: 12
       const updateRes = await call(`manager/reports/${createdReportId}`, 'PATCH', { notes: 'Updated notes' }, managerToken);
       assert.equal(updateRes.status, 200);
       assert.equal(updateRes.data.notes, 'Updated notes');
+
+      // 4b. EXPORT: Download CSV export
+      const csvRes = await call(`manager/reports/${createdReportId}/csv`, 'GET', undefined, managerToken);
+      assert.equal(csvRes.status, 200);
+      assert.ok(csvRes.data.includes('QueueDine End-of-Day Operations Report'));
+      assert.ok(csvRes.data.includes('2025-04-24'));
 
       // 5. DELETE: Remove report from database
       const deleteRes = await call(`manager/reports/${createdReportId}`, 'DELETE', undefined, managerToken);

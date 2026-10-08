@@ -707,3 +707,36 @@ export async function computeDailyReportMetrics(restaurantId: string, dateStr: s
     createdBy,
   };
 }
+
+export function exportReportToCsv(report: any): string {
+  const lines: string[] = [];
+  lines.push('QueueDine End-of-Day Operations Report');
+  lines.push(`Date,${report.date}`);
+  lines.push(`Date Label,"${report.dateLabel || report.date}"`);
+  lines.push(`Generated At,"${report.createdAt || report.generatedAt || new Date().toISOString()}"`);
+  lines.push('');
+  lines.push('Metric,Value');
+  lines.push(`Total Reservations,${report.totalReservations ?? 0}`);
+  lines.push(`Walk-ins,${report.walkIns ?? 0}`);
+  lines.push(`Customers Seated,${report.customersSeated ?? 0}`);
+  lines.push(`Average Wait Time (mins),${report.avgWaitTime ?? 0}`);
+  lines.push(`No-shows,${report.noShowsCount ?? 0} (${report.noShowsPercent ?? 0}%)`);
+  lines.push(`Walkaways,${report.walkawaysCount ?? 0} (${report.walkawaysPercent ?? 0}%)`);
+  lines.push(`Overall Occupancy,${report.overallOccupancy ?? 0}%`);
+  lines.push(`Peak Hour,"${report.peakHour || 'N/A'}"`);
+  lines.push(`Highest Wait Time (mins),${report.highestWaitTime ?? 0}`);
+  lines.push(`Notes,"${(report.notes || '').replace(/"/g, '""')}"`);
+  lines.push('');
+  lines.push('Hourly Customer Flow');
+  lines.push('Time,Reservations,Walk-ins,Seated');
+  if (Array.isArray(report.customerFlow)) {
+    for (const cf of report.customerFlow) {
+      const timeStr = cf.hour || cf.time || '';
+      const r = cf.reservations ?? cf.waitlist ?? 0;
+      const w = cf.walkIns ?? 0;
+      const s = cf.seated ?? 0;
+      lines.push(`"${timeStr}",${r},${w},${s}`);
+    }
+  }
+  return lines.join('\r\n');
+}

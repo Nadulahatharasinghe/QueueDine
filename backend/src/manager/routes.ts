@@ -11,6 +11,7 @@ import {
   getWalkawaysAnalyticsData,
   computeDailyReportMetrics,
   getTodayDateStr,
+  exportReportToCsv,
 } from './analytics';
 
 export const managerRoutes = Router();
@@ -152,6 +153,31 @@ managerRoutes.get('/reports/:id', wrap(async (req, res) => {
   const report = await StaffReport.findOne({ _id: String(req.params.id), restaurantId: staff.restaurantId });
   if (!report) throw new StaffError(404, 'Report not found.');
   res.json(report);
+}));
+
+// 10b. EXPORT Single Report as CSV
+managerRoutes.get('/reports/:id/csv', wrap(async (req, res) => {
+  const staff = res.locals.staff;
+  const report = await StaffReport.findOne({ _id: String(req.params.id), restaurantId: staff.restaurantId });
+  if (!report) throw new StaffError(404, 'Report not found.');
+  const csv = exportReportToCsv(report);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="QueueDine_Report_${report.date}.csv"`);
+  res.send(csv);
+}));
+
+// 10c. EXPORT Daily Report Preview as CSV
+managerRoutes.get('/reports/daily/csv', wrap(async (req, res) => {
+  const staff = res.locals.staff;
+  const date = typeof req.query.date === 'string' ? req.query.date : getTodayDateStr();
+  let report = await StaffReport.findOne({ restaurantId: staff.restaurantId, date });
+  if (!report) {
+    report = (await computeDailyReportMetrics(staff.restaurantId, date, staff.staffId)) as any;
+  }
+  const csv = exportReportToCsv(report);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="QueueDine_Report_${date}.csv"`);
+  res.send(csv);
 }));
 
 // 11. DELETE Saved Report

@@ -1,3 +1,4 @@
+import { Platform, Share } from 'react-native';
 import { staffApi } from './staffAuth';
 import { StaffTable, Party } from './staffData';
 
@@ -87,8 +88,9 @@ export interface StaffReportData {
   overallOccupancy: number;
   customerFlow: { hour: string; reservations: number; walkIns: number; seated: number }[];
   notes?: string;
-  createdBy: string;
-  createdAt: string;
+  createdBy?: string;
+  createdAt?: string;
+  generatedAt?: string;
 }
 
 export interface ManagerNotificationItem {
@@ -159,6 +161,72 @@ export const deleteReport = async (id: string) =>
 
 export const updateReportNotes = async (id: string, notes: string) =>
   (await staffApi.patch<StaffReportData>(`/api/manager/reports/${encodeURIComponent(id)}`, { notes })).data;
+
+export function generateReportCsv(report: StaffReportData): string {
+  const lines: string[] = [];
+  lines.push('QueueDine End-of-Day Operations Report');
+  lines.push(`Date,${report.date}`);
+  lines.push(`Date Label,"${report.dateLabel || report.date}"`);
+  lines.push(`Generated At,"${report.generatedAt || new Date().toISOString()}"`);
+  lines.push('');
+  lines.push('Metric,Value');
+  lines.push(`Total Reservations,${report.totalReservations ?? 0}`);
+  lines.push(`Walk-ins,${report.walkIns ?? 0}`);
+  lines.push(`Customers Seated,${report.customersSeated ?? 0}`);
+  lines.push(`Average Wait Time (mins),${report.avgWaitTime ?? 0}`);
+  lines.push(`No-shows,${report.noShowsCount ?? 0} (${report.noShowsPercent ?? 0}%)`);
+  lines.push(`Walkaways,${report.walkawaysCount ?? 0} (${report.walkawaysPercent ?? 0}%)`);
+  lines.push(`Overall Occupancy,${report.overallOccupancy ?? 0}%`);
+  lines.push(`Peak Hour,"${report.peakHour || 'N/A'}"`);
+  lines.push(`Highest Wait Time (mins),${report.highestWaitTime ?? 0}`);
+  lines.push(`Notes,"${(report.notes || '').replace(/"/g, '""')}"`);
+  lines.push('');
+  lines.push('Hourly Customer Flow');
+  lines.push('Time,Reservations,Walk-ins,Seated');
+  if (Array.isArray(report.customerFlow)) {
+    for (const item of report.customerFlow) {
+      const cf = item as Record<string, any>;
+      const timeStr = cf.hour || cf.time || '';
+      const r = cf.reservations ?? cf.waitlist ?? 0;
+      const w = cf.walkIns ?? 0;
+      const s = cf.seated ?? 0;
+      lines.push(`"${timeStr}",${r},${w},${s}`);
+    }
+  }
+  return lines.join('\r\n');
+}
+
+export async function downloadReportFile(report: StaffReportData): Promise<boolean> {
+  try {
+    const csvContent = generateReportCsv(report);
+    const fileName = `QueueDine_Report_${report.date}.csv`;
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        return true;
+      }
+    }
+
+    // Native mobile: Share sheet
+    await Share.share({
+      title: `QueueDine Report ${report.dateLabel || report.date}`,
+      message: csvContent,
+    });
+    return true;
+  } catch (err) {
+    console.error('Error downloading/sharing report:', err);
+    return false;
+  }
+}
 
 export const getManagerNotifications = async (category?: string) =>
   (await staffApi.get<ManagerNotificationItem[]>(`/api/manager/notifications${category && category !== 'All' ? `?category=${encodeURIComponent(category)}` : ''}`)).data;
