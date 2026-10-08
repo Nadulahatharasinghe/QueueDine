@@ -10,15 +10,34 @@ import {
   Alert,
   Modal,
   Switch,
+  Platform,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { isAxiosError } from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING, BORDER_RADIUS, SHADOWS } from '../src/constants/theme';
 import ScreenContainer from '../src/components/ScreenContainer';
 import CustomButton from '../src/components/CustomButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../src/services/api';
+
+type NativeImageFile = { uri: string; name: string; type: string };
+type NativeFormData = FormData & { append(name: string, value: NativeImageFile): void };
+
+const profileImageTypes: Record<string, { extension: string; mimeType: string }> = {
+  'image/jpeg': { extension: 'jpg', mimeType: 'image/jpeg' },
+  'image/jpg': { extension: 'jpg', mimeType: 'image/jpeg' },
+  'image/png': { extension: 'png', mimeType: 'image/png' },
+  'image/webp': { extension: 'webp', mimeType: 'image/webp' },
+};
+
+const profileImageExtensions: Record<string, { extension: string; mimeType: string }> = {
+  jpg: profileImageTypes['image/jpeg'],
+  jpeg: profileImageTypes['image/jpeg'],
+  png: profileImageTypes['image/png'],
+  webp: profileImageTypes['image/webp'],
+};
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
@@ -97,8 +116,8 @@ export default function ProfilePage() {
 
   const handleImagePick = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
         Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to make this work!');
         return;
       }
@@ -109,10 +128,8 @@ export default function ProfilePage() {
         aspect: [1, 1],
         quality: 0.8,
       });
-
       if (!result.canceled && result.assets[0]) {
-        const uri = result.assets[0].uri;
-        await uploadProfilePicture(uri);
+        await uploadProfilePicture(result.assets[0]);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -120,30 +137,58 @@ export default function ProfilePage() {
     }
   };
 
-  const uploadProfilePicture = async (uri: string) => {
+  const uploadProfilePicture = async (asset: ImagePicker.ImagePickerAsset) => {
     try {
-      const formData = new FormData();
-      formData.append('picture', {
-        uri,
-        type: 'image/jpeg',
-        name: 'profile.jpg',
-      } as any);
+      const mimeType = (asset.mimeType || asset.file?.type)?.toLowerCase();
+      const extensionFromMime = mimeType ? profileImageTypes[mimeType] : undefined;
+      if (mimeType && !extensionFromMime) {
+        throw new Error('Only JPG, JPEG, PNG, and WEBP images are allowed.');
+      }
 
-      const response = await apiClient.post('/api/users/profile/picture', formData, {
+      const fileNameExtension = (asset.fileName || asset.file?.name)?.match(/\.([^.]+)$/)?.[1]?.toLowerCase();
+      const uriExtension = asset.uri.match(/\.([^.\/?#]+)(?:[?#]|$)/)?.[1]?.toLowerCase();
+      const imageType = extensionFromMime
+        || (fileNameExtension ? profileImageExtensions[fileNameExtension] : undefined)
+        || (uriExtension ? profileImageExtensions[uriExtension] : undefined);
+      if (!imageType) {
+        throw new Error('Only JPG, JPEG, PNG, and WEBP images are allowed.');
+      }
+      if (typeof asset.fileSize === 'number' && asset.fileSize > 5 * 1024 * 1024) {
+        throw new Error('Profile photo exceeds the 5 MB limit.');
+      }
+
+      const form = new FormData();
+      const fileName = `profile-${Date.now()}.${imageType.extension}`;
+      if (Platform.OS === 'web') {
+        if (!asset.file) throw new Error('Unable to read the selected photo. Please choose it again.');
+        form.append('picture', asset.file, fileName);
+      } else {
+        (form as NativeFormData).append('picture', {
+          uri: asset.uri,
+          name: fileName,
+          type: imageType.mimeType,
+        });
+      }
+
+      const response = await apiClient.post('/api/users/profile/picture', form, {
+        timeout: 60000,
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': undefined,
         },
-        transformRequest: [(data) => data],
       });
 
       if (response.data.profilePicture) {
-        setUser({ ...user, profilePicture: response.data.profilePicture });
-        await AsyncStorage.setItem('user', JSON.stringify({ ...user, profilePicture: response.data.profilePicture }));
+        const updatedUser = { ...user, profilePicture: response.data.profilePicture };
+        setUser(updatedUser);
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
         Alert.alert('Success', 'Profile picture updated successfully');
       }
     } catch (error) {
       console.error('Error uploading picture:', error);
-      Alert.alert('Error', 'Failed to upload profile picture');
+      const message = isAxiosError(error) && typeof error.response?.data?.error === 'string'
+        ? error.response.data.error
+        : error instanceof Error ? error.message : 'Failed to upload profile picture';
+      Alert.alert('Error', message);
     }
   };
 
