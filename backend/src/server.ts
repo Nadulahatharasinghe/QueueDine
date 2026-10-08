@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/authRoutes';
 import { staffRoutes, releaseExpiredHolds } from './staff/routes';
+import { managerRoutes } from './manager/routes';
 import settingsRoutes from './routes/settingsRoutes';
 import userRoutes from './routes/userRoutes';
 import restaurantRoutes from './routes/restaurantRoutes';
@@ -24,6 +25,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/manager', managerRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/restaurants', restaurantRoutes);

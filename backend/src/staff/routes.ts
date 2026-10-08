@@ -73,6 +73,14 @@ staffRoutes.use(wrap(async (req, res, next) => {
   }
 }));
 
+staffRoutes.post('/auth/logout', wrap(async (_req, res) => {
+  const sessionId = res.locals.sessionId;
+  if (sessionId) {
+    await StaffSession.deleteOne({ _id: sessionId });
+  }
+  res.sendStatus(204);
+}));
+
 async function record(a: Account, message: string, category: 'Queue' | 'Reservations' | 'System', session: ClientSession, partyId?: string, tableId?: string) {
   const event = { restaurantId: a.restaurantId, actorName: a.fullName, message, category, partyId, tableId };
   await StaffEvent.create([event], { session });
