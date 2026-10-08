@@ -1,6 +1,15 @@
 import apiClient from './api';
 import { Restaurant, Table, QueueStatsResponse } from '../types';
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+
+export function photoUri(relative: string | null | undefined): string | null {
+  if (!relative) return null;
+  if (/^https?:\/\//i.test(relative)) return relative;
+  const trimmed = relative.startsWith('/') ? relative : `/${relative}`;
+  return `${API_URL.replace(/\/$/, '')}${trimmed}`;
+}
+
 export const getRestaurants = async (): Promise<Restaurant[]> => {
   const { data } = await apiClient.get<Restaurant[]>('/api/restaurants');
   return data;

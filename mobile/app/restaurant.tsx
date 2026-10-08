@@ -19,7 +19,7 @@ import {
 } from '../src/constants/theme';
 import CustomButton from '../src/components/CustomButton';
 import ScreenContainer from '../src/components/ScreenContainer';
-import { getFirstRestaurant } from '../src/services/restaurantService';
+import { getFirstRestaurant, photoUri } from '../src/services/restaurantService';
 import { Restaurant as RestaurantType } from '../src/types';
 
 export default function RestaurantScreen() {
@@ -27,6 +27,7 @@ export default function RestaurantScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'Overview' | 'Menu' | 'Info'>('Overview');
+  const [imageFailed, setImageFailed] = useState(false);
 
   const loadRestaurant = async () => {
     try {
@@ -85,11 +86,20 @@ export default function RestaurantScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={styles.heroContainer}>
           <View style={styles.hero}>
-            <Image
-              source={require('../assets/welcome_page_background_image.png')}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
+            {!imageFailed && restaurant.imageUrl && photoUri(restaurant.imageUrl) ? (
+              <Image
+                source={{ uri: photoUri(restaurant.imageUrl)! }}
+                style={styles.heroImage}
+                resizeMode="cover"
+                onError={() => setImageFailed(true)}
+              />
+            ) : (
+              <Image
+                source={require('../assets/welcome_page_background_image.png')}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+            )}
             <View style={styles.heroOverlay} />
           </View>
           <TouchableOpacity
@@ -146,21 +156,27 @@ export default function RestaurantScreen() {
               <Text style={styles.statIcon}>{'\u{23F1}'}</Text>
               <Text style={styles.statLabel}>Current Wait Time</Text>
               <Text style={styles.statWaitGreen}>
-                ~ {restaurant.currentWaitTime || 25} minutes
+                {restaurant.currentWaitTime != null
+                  ? `~ ${restaurant.currentWaitTime} minutes`
+                  : '\u2014'}
               </Text>
             </View>
             <View style={styles.statRow}>
               <Text style={styles.statIcon}>{'\u{1F465}'}</Text>
               <Text style={styles.statLabel}>Queue Length</Text>
               <Text style={styles.statValueRight}>
-                {restaurant.queueLength ?? 12} parties ahead
+                {restaurant.queueLength != null
+                  ? `${restaurant.queueLength} parties ahead`
+                  : '\u2014'}
               </Text>
             </View>
             <View style={styles.statRow}>
               <Text style={styles.statIcon}>{'\u{1FA91}'}</Text>
               <Text style={styles.statLabel}>Available Tables</Text>
               <Text style={styles.statValueRight}>
-                {restaurant.availableTables ?? 8} tables
+                {restaurant.availableTables != null
+                  ? `${restaurant.availableTables} tables`
+                  : '\u2014'}
               </Text>
             </View>
           </View>

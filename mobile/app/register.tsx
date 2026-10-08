@@ -193,26 +193,6 @@ export default function RegisterPage() {
             style={styles.button}
           />
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or continue with</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <CustomButton
-            title="Continue with Google"
-            onPress={() => {}}
-            variant="outline"
-            style={styles.socialButton}
-          />
-
-          <CustomButton
-            title="Continue with Apple"
-            onPress={() => {}}
-            variant="outline"
-            style={styles.socialButton}
-          />
-
           <TouchableOpacity
             style={styles.signInContainer}
             onPress={() => router.push('/login')}
@@ -375,24 +355,6 @@ const styles = StyleSheet.create({
   },
   button: {
     marginBottom: SPACING.lg,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.lg,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.border,
-  },
-  dividerText: {
-    paddingHorizontal: SPACING.md,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textLight,
-  },
-  socialButton: {
-    marginBottom: SPACING.md,
   },
   signInContainer: {
     alignItems: 'center',

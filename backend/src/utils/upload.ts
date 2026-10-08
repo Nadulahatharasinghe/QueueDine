@@ -8,14 +8,14 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
-  const allowedTypes = /jpeg|jpg|png|gif/;
+  const allowedTypes = /jpeg|jpg|png|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
 
   if (extname && mimetype) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed!'));
+    cb(new Error('Only JPG, JPEG, PNG, and WEBP images are allowed.'));
   }
 };
 

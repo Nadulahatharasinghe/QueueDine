@@ -11,8 +11,10 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { chromium } from '@playwright/test';
 import { staffRoutes, releaseExpiredHolds } from '../src/staff/routes';
 import { StaffAccount, StaffRestaurant, StaffTable, StaffParty, StaffSession, StaffEvent, StaffNotification, StaffAlert } from '../src/staff/models';
+import { seedStaffAccount } from '../src/staff/seedAccount';
 import authRoutes from '../src/routes/authRoutes';
 import User from '../src/models/User';
+import Restaurant from '../src/models/Restaurant';
 
 test('staff portal integration in an isolated replica set', { timeout: 1200000 }, async t => {
   // Never load .env: these tests cannot connect to the shared Atlas database.
@@ -26,10 +28,21 @@ test('staff portal integration in an isolated replica set', { timeout: 1200000 }
   const server = app.listen(0, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));
   const address = server.address() as { port: number }, base = `http://127.0.0.1:${address.port}`;
-  const models = [StaffRestaurant, StaffAccount, StaffTable, StaffParty, StaffSession, StaffEvent, StaffNotification, StaffAlert, User];
+  const models = [Restaurant, StaffRestaurant, StaffAccount, StaffTable, StaffParty, StaffSession, StaffEvent, StaffNotification, StaffAlert, User];
   for (const model of models) await model.init();
   const hash = await bcrypt.hash('TestStaffPass123!', 4);
-  await StaffRestaurant.create([{ _id: 'a', name: 'Ember & Oak', location: 'Colombo' }, { _id: 'b', name: 'Other Restaurant' }]);
+  const customerRestaurant = await Restaurant.create({
+    name: 'Ember & Oak',
+    location: 'Colombo',
+    rating: 4.5,
+    reviewCount: 12,
+    description: 'A test restaurant',
+    openingHours: { open: '11:00', close: '23:00' },
+  });
+  await StaffRestaurant.create([
+    { _id: 'a', name: 'Ember & Oak', location: 'Colombo', customerRestaurantId: customerRestaurant._id },
+    { _id: 'b', name: 'Other Restaurant' },
+  ]);
   const a = await StaffAccount.create({ restaurantId: 'a', staffId: 'host-001', email: 'host@test.invalid', fullName: 'Tharindu Silva', passwordHash: hash });
   await StaffAccount.create({ restaurantId: 'b', staffId: 'host-002', email: 'other@test.invalid', fullName: 'Other Host', passwordHash: hash });
   const table1 = await StaffTable.create({ restaurantId: 'a', number: 'T01', capacity: 4 });
@@ -54,6 +67,103 @@ test('staff portal integration in an isolated replica set', { timeout: 1200000 }
       token = login.data.token;
       const wrongAudience = jwt.sign({ accountId: a._id }, process.env.STAFF_JWT_SECRET!);
       assert.equal((await call('staff/dashboard', 'GET', undefined, wrongAudience)).status, 401);
+    });
+    await t.test('seeded host password reset is scoped and produces a staff JWT', async () => {
+      const seededPassword = 'SeededHostPass123!';
+      const otherPassword = 'OtherStaffPass123!';
+      const otherHash = await bcrypt.hash(otherPassword, 4);
+      const seededHost = await StaffAccount.findById(a._id).select('+passwordHash');
+      assert.ok(seededHost);
+      await StaffAccount.updateOne(
+        { _id: seededHost._id },
+        { $set: { email: 'host@queuedine.local', restaurantId: 'ember-oak' } },
+      );
+      const otherStaff = await StaffAccount.create({
+        restaurantId: 'b', staffId: 'other-003', email: 'other@queuedine.local',
+        fullName: 'Other Staff', passwordHash: otherHash,
+      });
+
+      const originalNodeEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'development';
+        await seedStaffAccount({
+          restaurantId: 'ember-oak', staffId: 'host-001', email: 'host@queuedine.local',
+          fullName: 'Seeded Host', password: seededPassword, resetPassword: true,
+        });
+
+        const updated = await StaffAccount.findById(seededHost._id).select('+passwordHash');
+        assert.ok(updated);
+        assert.equal(await bcrypt.compare(seededPassword, updated.passwordHash), true);
+        assert.equal(await bcrypt.compare('TestStaffPass123!', updated.passwordHash), false);
+        const unchangedOther = await StaffAccount.findById(otherStaff._id).select('+passwordHash');
+        assert.ok(unchangedOther);
+        assert.equal(await bcrypt.compare(otherPassword, unchangedOther.passwordHash), true);
+
+        const login = await call('staff/auth/login', 'POST', {
+          identifier: 'host@queuedine.local', password: seededPassword,
+        }, '');
+        assert.equal(login.status, 200);
+        assert.equal(login.data.user.staffId, 'host-001');
+        assert.equal(login.data.user.restaurantId, 'ember-oak');
+        assert.equal(login.data.user.passwordHash, undefined);
+        const claims = jwt.verify(login.data.token, process.env.STAFF_JWT_SECRET!, {
+          audience: 'queuedine-staff',
+        }) as jwt.JwtPayload;
+        assert.equal(claims.accountId, seededHost._id);
+        assert.ok(claims.sessionId);
+
+        await assert.rejects(seedStaffAccount({
+          restaurantId: 'b', staffId: 'other-003', email: 'other@queuedine.local',
+          fullName: 'Other Staff', password: 'ShouldNotCreate123!', resetPassword: true,
+        }), /restricted to the seeded host account/);
+        process.env.NODE_ENV = 'production';
+        await assert.rejects(seedStaffAccount({
+          restaurantId: 'ember-oak', staffId: 'host-001', email: 'host@queuedine.local',
+          fullName: 'Seeded Host', password: 'ShouldNotReset123!', resetPassword: true,
+        }), /only in local development/);
+      } finally {
+        if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = originalNodeEnv;
+        await StaffAccount.updateOne(
+          { _id: seededHost._id },
+          {
+            $set: {
+              email: 'host@test.invalid',
+              restaurantId: 'a',
+              passwordHash: seededHost.passwordHash,
+            },
+          },
+        );
+      }
+    });
+    await t.test('restaurant profile reads and updates the canonical customer restaurant', async () => {
+      const original = await Restaurant.findById(customerRestaurant._id);
+      assert.ok(original);
+      const profile = await call('staff/restaurant');
+      assert.equal(profile.status, 200);
+      assert.equal(profile.data._id, String(customerRestaurant._id));
+      assert.equal(profile.data.name, original.name);
+
+      const updated = await call('staff/restaurant', 'PUT', {
+        name: `${original.name} Test`,
+        location: 'Colombo 02',
+        description: 'Updated test description',
+        cuisine: 'Sri Lankan',
+        openingHours: { open: '10:30', close: '22:30' },
+      });
+      assert.equal(updated.status, 200);
+      const persisted = await Restaurant.findById(customerRestaurant._id);
+      assert.equal(persisted?.name, 'Ember & Oak Test');
+      assert.equal(persisted?.location, 'Colombo 02');
+      assert.equal((await StaffRestaurant.findById('a'))?.name, 'Ember & Oak Test');
+      await Restaurant.updateOne({ _id: customerRestaurant._id }, { $set: {
+        name: original.name,
+        location: original.location,
+        description: original.description,
+        cuisine: original.cuisine,
+        openingHours: original.openingHours,
+      } });
+      await StaffRestaurant.updateOne({ _id: 'a' }, { $set: { name: 'Ember & Oak', location: 'Colombo' } });
     });
     await t.test('validates forms and saves retries only once', async () => {
       assert.equal((await call('staff/parties', 'POST', { ...details, partySize: 0 })).status, 400);

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../src/constants/theme';
 import ScreenContainer from '../src/components/ScreenContainer';
 import { getReservations } from '../src/services/reservationService';
+import { photoUri } from '../src/services/restaurantService';
 import { Reservation } from '../src/types';
 
 type FilterType = 'all' | 'confirmed' | 'cancelled' | 'completed';
@@ -151,6 +153,10 @@ export default function ReservationsScreen() {
             const restaurant =
               typeof r.restaurantId === 'object' ? r.restaurantId : null;
             const table = typeof r.tableId === 'object' ? r.tableId : null;
+            const thumbUrl =
+              restaurant?.imageUrl && photoUri(restaurant.imageUrl)
+                ? photoUri(restaurant.imageUrl)
+                : null;
             return (
               <TouchableOpacity
                 key={r._id}
@@ -163,43 +169,58 @@ export default function ReservationsScreen() {
                   })
                 }
               >
-                <View style={styles.cardTop}>
-                  <Text style={styles.restaurantName}>
-                    {restaurant?.name || 'Restaurant'}
-                  </Text>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: statusColor(r.status) + '20' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusBadgeText,
-                        { color: statusColor(r.status) },
-                      ]}
-                    >
-                      {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.cardDetails}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailIcon}>{'\u{1F4C5}'}</Text>
-                    <Text style={styles.detailText}>
-                      {formatDate(r.date)} \u2022 {formatTime12(r.time)}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailIcon}>{'\u{1F465}'}</Text>
-                    <Text style={styles.detailText}>{r.guests} people</Text>
-                  </View>
-                  {table ? (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailIcon}>{'\u{1FA91}'}</Text>
-                      <Text style={styles.detailText}>Table {table.tableNumber}</Text>
+                <View style={styles.cardRow}>
+                  {thumbUrl ? (
+                    <Image
+                      source={{ uri: thumbUrl! }}
+                      style={styles.thumbnail}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
+                      <Text style={styles.thumbnailText}>{'\u{1F37D}'}</Text>
                     </View>
-                  ) : null}
+                  )}
+                  <View style={{ flex: 1, marginLeft: SPACING.md }}>
+                    <View style={styles.cardTop}>
+                      <Text style={styles.restaurantName}>
+                        {restaurant?.name || 'Restaurant'}
+                      </Text>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: statusColor(r.status) + '20' },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusBadgeText,
+                            { color: statusColor(r.status) },
+                          ]}
+                        >
+                          {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.cardDetails}>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailIcon}>{'\u{1F4C5}'}</Text>
+                        <Text style={styles.detailText}>
+                          {formatDate(r.date)} \u2022 {formatTime12(r.time)}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailIcon}>{'\u{1F465}'}</Text>
+                        <Text style={styles.detailText}>{r.guests} people</Text>
+                      </View>
+                      {table ? (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailIcon}>{'\u{1FA91}'}</Text>
+                          <Text style={styles.detailText}>Table {table.tableNumber}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
                 </View>
               </TouchableOpacity>
             );
@@ -279,6 +300,23 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.md,
     ...SHADOWS.sm,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+  },
+  thumbnailPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbnailText: {
+    fontSize: 28,
   },
   cardTop: {
     flexDirection: 'row',

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View, ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,7 +34,6 @@ export default function StaffLogin() {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [helpVisible, setHelpVisible] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -134,22 +133,10 @@ export default function StaffLogin() {
                 onPress={submit} disabled={loading} accessibilityRole="button" accessibilityState={{ disabled: loading, busy: loading }}>
                 {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.signInText}>Sign In</Text>}
               </Pressable>
-              <Pressable style={styles.forgotButton} onPress={() => setHelpVisible(true)} accessibilityRole="button">
-                <Text style={styles.forgotText}>Forgot password?</Text>
-              </Pressable>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
-      <Modal visible={helpVisible} transparent animationType="fade" onRequestClose={() => setHelpVisible(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.helpCard} accessibilityViewIsModal>
-            <Text style={styles.helpTitle}>Need help signing in?</Text>
-            <Text style={styles.helpText}>Contact your restaurant manager to reset your staff password or check your account access.</Text>
-            <Pressable style={styles.signInButton} onPress={() => setHelpVisible(false)} accessibilityRole="button"><Text style={styles.signInText}>Got it</Text></Pressable>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -192,10 +179,4 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: '#A12A37' },
   busy: { opacity: 0.7 },
   error: { color: '#FFD6D6', fontSize: 13, lineHeight: 19, marginBottom: 14 },
-  forgotButton: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 18, marginBottom: 100 },
-  forgotText: { color: '#B2A9A1', fontSize: 13 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  helpCard: { width: '100%', maxWidth: 360, padding: 24, borderRadius: 16, backgroundColor: '#241C16', borderWidth: 1, borderColor: '#554332' },
-  helpTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
-  helpText: { color: '#D6CEC6', fontSize: 14, lineHeight: 22, marginVertical: 20 },
 });

@@ -5,7 +5,8 @@ export interface IRestaurant extends Document {
   location: string;
   rating: number;
   reviewCount: number;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  photoFileId?: mongoose.Types.ObjectId | null;
   description: string;
   openingHours: {
     open: string;
@@ -43,6 +44,11 @@ const RestaurantSchema: Schema = new Schema(
     imageUrl: {
       type: String,
       default: null,
+    },
+    photoFileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+      ref: 'restaurant_photos.files',
     },
     description: {
       type: String,

@@ -4,8 +4,13 @@ import Table from '../models/Table';
 import Reservation from '../models/Reservation';
 import QueueEntry from '../models/QueueEntry';
 import mongoose from 'mongoose';
+import { findFileById, openDownloadStream } from '../utils/gridfs';
 
 const AVERAGE_WAIT_PER_PARTY_MIN = 2;
+
+const photoUrlFor = (r: { _id: mongoose.Types.ObjectId | string; photoFileId?: unknown }) => {
+  return r.photoFileId ? `/api/restaurants/${r._id}/photo` : null;
+};
 
 export const listRestaurants = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -19,13 +24,14 @@ export const listRestaurants = async (req: Request, res: Response): Promise<void
           Table.countDocuments({ restaurantId, status: 'available' }),
         ]);
         const estimatedWait = queueLength * AVERAGE_WAIT_PER_PARTY_MIN;
+        const imageUrl = photoUrlFor(r);
         return {
           _id: r._id,
           name: r.name,
           location: r.location,
           rating: r.rating,
           reviewCount: r.reviewCount,
-          imageUrl: r.imageUrl,
+          imageUrl,
           description: r.description,
           openingHours: r.openingHours,
           cuisine: r.cuisine,
@@ -65,6 +71,7 @@ export const getRestaurantById = async (req: Request, res: Response): Promise<vo
     ]);
 
     const estimatedWait = queueLength * AVERAGE_WAIT_PER_PARTY_MIN;
+    const imageUrl = photoUrlFor(restaurant);
 
     res.status(200).json({
       _id: restaurant._id,
@@ -72,7 +79,7 @@ export const getRestaurantById = async (req: Request, res: Response): Promise<vo
       location: restaurant.location,
       rating: restaurant.rating,
       reviewCount: restaurant.reviewCount,
-      imageUrl: restaurant.imageUrl,
+      imageUrl,
       description: restaurant.description,
       openingHours: restaurant.openingHours,
       cuisine: restaurant.cuisine,
@@ -88,6 +95,49 @@ export const getRestaurantById = async (req: Request, res: Response): Promise<vo
     } else {
       res.status(500).json({ error: 'Failed to fetch restaurant' });
     }
+  }
+};
+
+export const getRestaurantPhoto = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const restaurant = await Restaurant.findById(id);
+    if (!restaurant) {
+      res.status(404).json({ error: 'Restaurant not found' });
+      return;
+    }
+    if (!restaurant.photoFileId) {
+      res.status(404).json({ error: 'Restaurant photo not found' });
+      return;
+    }
+    const file = await findFileById(restaurant.photoFileId);
+    if (!file) {
+      res.status(404).json({ error: 'Restaurant photo not found' });
+      return;
+    }
+    const metadataContentType = (file.metadata as any)?.contentType;
+    const directContentType = (file as any).contentType;
+    let contentType: string;
+    if (metadataContentType) contentType = metadataContentType;
+    else if (directContentType) contentType = directContentType;
+    else if (/\.png$/i.test(file.filename)) contentType = 'image/png';
+    else if (/\.webp$/i.test(file.filename)) contentType = 'image/webp';
+    else contentType = 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    const stream = openDownloadStream(restaurant.photoFileId);
+    let sent = false;
+    stream.on('error', (_err: unknown) => {
+      if (sent) return;
+      sent = true;
+      if (!res.headersSent) res.status(404).json({ error: 'Restaurant photo not found' });
+      else res.end();
+    });
+    stream.on('end', () => { sent = true; });
+    stream.pipe(res);
+  } catch (error) {
+    if (res.headersSent) return;
+    res.status(500).json({ error: 'Failed to fetch restaurant photo' });
   }
 };
 

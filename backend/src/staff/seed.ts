@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { StaffAccount, StaffRestaurant, StaffTable, StaffParty, StaffNotification } from './models';
 import { StaffReport } from '../manager/models';
 import { formatDateLabel } from '../manager/analytics';
+import { seedStaffAccount } from './seedAccount';
+import Restaurant from '../models/Restaurant';
 
 function getIsoDate(d: Date): string {
   const year = d.getFullYear();
@@ -14,35 +16,35 @@ function getIsoDate(d: Date): string {
 
 async function main() {
   if (!process.env.MONGODB_URI) throw new Error('Set MONGODB_URI in backend/.env.');
+  if (
+    process.env.STAFF_SEED_RESET_PASSWORD === 'true' &&
+    !['development', 'test'].includes(process.env.NODE_ENV || '')
+  ) {
+    throw new Error('STAFF_SEED_RESET_PASSWORD is available only in local development.');
+  }
   await mongoose.connect(process.env.MONGODB_URI);
   const restaurantId = 'ember-oak';
 
+  const customerRestaurant = await Restaurant.findOne({ name: 'Ember & Oak' });
+  const staffRestSet: Record<string, unknown> = { name: 'Ember & Oak', location: 'Colombo', timeZone: 'Asia/Colombo' };
+  if (customerRestaurant) staffRestSet.customerRestaurantId = customerRestaurant._id;
   await StaffRestaurant.updateOne(
     { _id: restaurantId },
-    { $setOnInsert: { name: 'Ember & Oak', location: 'Colombo', timeZone: 'Asia/Colombo' } },
+    { $setOnInsert: staffRestSet, $set: customerRestaurant ? { customerRestaurantId: customerRestaurant._id } : {} },
     { upsert: true }
   );
 
   // 1. Seed Host Account (Tharindu Silva)
-  const hostId = process.env.STAFF_SEED_ID || 'host-001';
-  const hostEmail = (process.env.STAFF_SEED_EMAIL || 'host@example.com').toLowerCase();
-  const hostPass = process.env.STAFF_SEED_PASSWORD || 'HostStaffPass123!';
-  const existingHost = await StaffAccount.findOne({ $or: [{ email: hostEmail }, { staffId: hostId }] });
-  if (!existingHost) {
-    await StaffAccount.create({
-      restaurantId,
-      email: hostEmail,
-      staffId: hostId,
-      fullName: process.env.STAFF_SEED_NAME || 'Tharindu Silva',
-      passwordHash: await bcrypt.hash(hostPass, 12),
-      role: 'host',
-      shiftStart: '16:00',
-      shiftEnd: '23:00',
-    });
-    console.log(`Seeded host account: ${hostEmail} (ID: ${hostId})`);
-  } else {
-    console.log(`Host account already exists: ${existingHost.email} (ID: ${existingHost.staffId})`);
-  }
+  const hostEmail = (process.env.STAFF_SEED_EMAIL || 'host@queuedine.local').toLowerCase();
+  const hostPass = process.env.STAFF_SEED_PASSWORD || 'Host@12345';
+  await seedStaffAccount({
+    restaurantId,
+    email: hostEmail,
+    staffId: process.env.STAFF_SEED_ID || 'host-001',
+    fullName: process.env.STAFF_SEED_NAME || 'Tharindu Silva',
+    password: hostPass,
+    resetPassword: process.env.STAFF_SEED_RESET_PASSWORD === 'true',
+  });
 
   // 2. Seed Manager Account (R. Perera)
   const managerId = process.env.MANAGER_SEED_ID || 'manager-001';

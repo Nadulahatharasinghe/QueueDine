@@ -103,9 +103,6 @@ export default function LoginPage() {
               <Text style={styles.checkboxLabel}>Remember me</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity>
-              <Text style={styles.forgotPassword}>Forgot password?</Text>
-            </TouchableOpacity>
           </View>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -117,32 +114,12 @@ export default function LoginPage() {
             style={styles.button}
           />
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or continue with</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <CustomButton
-            title="Continue with Google"
-            onPress={() => {}}
-            variant="outline"
-            style={styles.socialButton}
-          />
-
-          <CustomButton
-            title="Continue with Apple"
-            onPress={() => {}}
-            variant="outline"
-            style={styles.socialButton}
-          />
-
           <TouchableOpacity
             style={styles.registerContainer}
             onPress={() => router.push('/register')}
           >
             <Text style={styles.registerText}>
-              Don't have an account? <Text style={styles.registerLink}>Create Account</Text>
+              Don&apos;t have an account? <Text style={styles.registerLink}>Create Account</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -236,11 +213,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
   },
-  forgotPassword: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary,
-    fontWeight: FONT_WEIGHTS.medium,
-  },
   errorText: {
     color: COLORS.error,
     fontSize: FONT_SIZES.sm,
@@ -249,24 +221,6 @@ const styles = StyleSheet.create({
   },
   button: {
     marginBottom: SPACING.lg,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.lg,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.border,
-  },
-  dividerText: {
-    paddingHorizontal: SPACING.md,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textLight,
-  },
-  socialButton: {
-    marginBottom: SPACING.md,
   },
   registerContainer: {
     alignItems: 'center',

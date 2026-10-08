@@ -7,6 +7,7 @@ const restaurantId = { type: String, required: true, index: true };
 export const StaffRestaurant = mongoose.model('StaffRestaurant', new Schema({
   _id: id, name: { type: String, required: true }, location: String,
   timeZone: { type: String, default: 'Asia/Colombo' },
+  customerRestaurantId: { type: Schema.Types.ObjectId, ref: 'Restaurant', default: null, index: true },
 }, { timestamps: true, collection: 'staff_restaurants' }));
 export const StaffAccount = mongoose.model('StaffAccount', new Schema({
   _id: id, restaurantId, staffId: { type: String, required: true, unique: true },
